@@ -1,72 +1,102 @@
-# Data Warehouse and Analytics Project
+# 🏭 Data Warehouse & Analytics Project
 
-Welcome to the **Data Warehouse and Analytics Project** repository! 🚀  
-This project demonstrates a comprehensive data warehousing and analytics solution, from building a data warehouse to generating actionable insights. Designed as a portfolio project, it highlights industry best practices in data engineering and analytics.
+A portfolio project where I build an end-to-end data warehouse using SQL Server —
+covering data ingestion, transformation, modeling, and SQL-based analytics.
+
+Built by following the [Data With Baraa](http://bit.ly/3GiCVUE) YouTube tutorial series
+as part of my learning journey in data engineering and analytics.
 
 ---
-## 🏗️ Data Architecture
 
-The data architecture for this project follows Medallion Architecture **Bronze**, **Silver**, and **Gold** layers:
+## 🏗️ Architecture Overview
+
+This project follows the **Medallion Architecture** — a three-layer approach to organizing
+data from raw to business-ready.
+
 ![Data Architecture](docs/data_architecture.png)
 
-1. **Bronze Layer**: Stores raw data as-is from the source systems. Data is ingested from CSV Files into SQL Server Database.
-2. **Silver Layer**: This layer includes data cleansing, standardization, and normalization processes to prepare data for analysis.
-3. **Gold Layer**: Houses business-ready data modeled into a star schema required for reporting and analytics.
-
----
-## 📖 Project Overview
-
-This project involves:
-
-1. **Data Architecture**: Designing a Modern Data Warehouse Using Medallion Architecture **Bronze**, **Silver**, and **Gold** layers.
-2. **ETL Pipelines**: Extracting, transforming, and loading data from source systems into the warehouse.
-3. **Data Modeling**: Developing fact and dimension tables optimized for analytical queries.
-4. **Analytics & Reporting**: Creating SQL-based reports and dashboards for actionable insights.
-
-## 🛠️ Important Links & Tools:
-
-Everything is for Free!
-- **[Datasets](datasets/):** Access to the project dataset (csv files).
-- **SQL Server Express:** Lightweight server for hosting your SQL database.
-- **SQL Server Management Studio (SSMS):** GUI for managing and interacting with databases.
-- **Git Repository:** Set up a GitHub account and repository to manage, version, and collaborate on your code efficiently.
-- **DrawIO:** Design data architecture, models, flows, and diagrams.
-
-## 🚀 Project Requirements
-
-### Building the Data Warehouse (Data Engineering)
-
-#### Objective
-Develop a modern data warehouse using SQL Server to consolidate sales data, enabling analytical reporting and informed decision-making.
-
-#### Specifications
-- **Data Sources**: Import data from two source systems (ERP and CRM) provided as CSV files.
-- **Data Quality**: Cleanse and resolve data quality issues prior to analysis.
-- **Integration**: Combine both sources into a single, user-friendly data model designed for analytical queries.
-- **Scope**: Focus on the latest dataset only; historization of data is not required.
-- **Documentation**: Provide clear documentation of the data model to support both business stakeholders and analytics teams.
+| Layer | What happens here |
+|-------|-------------------|
+| 🥉 **Bronze** | Raw CSV data loaded as-is into SQL Server — no changes |
+| 🥈 **Silver** | Data is cleaned, standardized, and normalized |
+| 🥇 **Gold** | Business-ready star schema (fact + dimension tables) for reporting |
 
 ---
 
-### BI: Analytics & Reporting (Data Analysis)
+## 📖 What This Project Covers
 
-#### Objective
-Develop SQL-based analytics to deliver detailed insights into:
-- **Customer Behavior**
-- **Product Performance**
-- **Sales Trends**
+| Area | Description |
+|------|-------------|
+| Data Architecture | Medallion Architecture design (Bronze → Silver → Gold) |
+| ETL Pipelines | Extract, Transform, Load from ERP and CRM CSV sources |
+| Data Modeling | Star schema with fact and dimension tables |
+| SQL Analytics | Customer behavior, product performance, and sales trend analysis |
 
-These insights empower stakeholders with key business metrics, enabling strategic decision-making.  
+---
 
-For more details, refer to [docs/requirements.md](docs/requirements.md).
+## 🛠️ Tools Used
+
+All free!
+
+| Tool | Purpose | Link |
+|------|---------|------|
+| SQL Server Express | Host the SQL database | [Download](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) |
+| SSMS | GUI to manage and query the database | [Download](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms) |
+| DrawIO | Architecture and data flow diagrams | [drawio.com](https://www.drawio.com/) |
+| Git + GitHub | Version control | [github.com](https://github.com/) |
+
+---
+
+## 📁 Repository Structure
+
+```
+data-warehouse-project/
+│
+├── datasets/          # Source CSV files (ERP and CRM raw data)
+│
+├── docs/              # Architecture diagrams and documentation
+│   ├── data_architecture.drawio
+│   ├── data_flow.drawio
+│   ├── data_models.drawio
+│   ├── etl.drawio
+│   ├── data_catalog.md
+│   └── naming-conventions.md
+│
+├── scripts/           # SQL scripts organized by layer
+│   ├── bronze/        # Raw data ingestion
+│   ├── silver/        # Cleaning and transformation
+│   └── gold/          # Analytical models
+│
+├── tests/             # Data quality checks
+├── README.md
+├── LICENSE
+└── .gitignore
+```
+
+---
+
+## 📊 Analytics Goals
+
+SQL queries built to answer:
+
+- **Customer Behavior** — purchase patterns, frequency, segmentation
+- **Product Performance** — top/bottom performing products
+- **Sales Trends** — revenue over time, seasonal patterns
+
+See [`docs/requirements.md`](docs/requirements.md) for detailed specs.
+
+---
+
+## 🙏 Credit
+
+This project is built by following the free tutorial by **Baraa Khatib Salkini**:
+
+[![YouTube](https://img.shields.io/badge/YouTube-Tutorial-red?style=for-the-badge&logo=youtube&logoColor=white)](http://bit.ly/3GiCVUE)
+
+All credit for the curriculum and project design goes to [Data With Baraa](https://www.datawithbaraa.com).
 
 ---
 
 ## 🛡️ License
 
-This project is licensed under the [MIT License](LICENSE). You are free to use, modify, and share this project with proper attribution.
-
-## 🌟 Reference
-
-[![YouTube](https://img.shields.io/badge/YouTube-red?style=for-the-badge&logo=youtube&logoColor=white)](http://bit.ly/3GiCVUE)
-
+[MIT License](LICENSE)
