@@ -48,7 +48,7 @@ BEGIN
 		PRINT '>> Inserting Data Into: bronze.crm_cust_info';
 		-- Bulk insert raw customer data from CSV; skip row 1 (header), use comma as delimiter
 		BULK INSERT bronze.crm_cust_info
-		FROM 'C:\sql\dwh_project\datasets\source_crm\cust_info.csv'
+		FROM 'D:\DataWarehouse Project\Dataset\source_crm\cust_info.csv'
 		WITH (
 			FIRSTROW = 2,          -- Skip the header row in the CSV file
 			FIELDTERMINATOR = ',', -- Columns are separated by commas
@@ -71,7 +71,7 @@ BEGIN
 		PRINT '>> Inserting Data Into: bronze.crm_prd_info';
 		-- Bulk insert raw product data from CSV; skip row 1 (header), use comma as delimiter
 		BULK INSERT bronze.crm_prd_info
-		FROM 'C:\sql\dwh_project\datasets\source_crm\prd_info.csv'
+		FROM 'D:\DataWarehouse Project\Dataset\source_crm\prd_info.csv'
 		WITH (
 			FIRSTROW = 2,          -- Skip the header row in the CSV file
 			FIELDTERMINATOR = ',', -- Columns are separated by commas
@@ -94,7 +94,7 @@ BEGIN
 		PRINT '>> Inserting Data Into: bronze.crm_sales_details';
 		-- Bulk insert raw sales order data from CSV; skip row 1 (header), use comma as delimiter
 		BULK INSERT bronze.crm_sales_details
-		FROM 'C:\sql\dwh_project\datasets\source_crm\sales_details.csv'
+		FROM 'D:\DataWarehouse Project\Dataset\source_crm\sales_details.csv'
 		WITH (
 			FIRSTROW = 2,          -- Skip the header row in the CSV file
 			FIELDTERMINATOR = ',', -- Columns are separated by commas
@@ -121,7 +121,7 @@ BEGIN
 		PRINT '>> Inserting Data Into: bronze.erp_loc_a101';
 		-- Bulk insert raw location data from CSV; skip row 1 (header), use comma as delimiter
 		BULK INSERT bronze.erp_loc_a101
-		FROM 'C:\sql\dwh_project\datasets\source_erp\loc_a101.csv'
+		FROM 'D:\DataWarehouse Project\Dataset\source_erp\LOC_A101.csv'
 		WITH (
 			FIRSTROW = 2,          -- Skip the header row in the CSV file
 			FIELDTERMINATOR = ',', -- Columns are separated by commas
@@ -144,7 +144,7 @@ BEGIN
 		PRINT '>> Inserting Data Into: bronze.erp_cust_az12';
 		-- Bulk insert raw customer demographics from CSV; skip row 1 (header), use comma as delimiter
 		BULK INSERT bronze.erp_cust_az12
-		FROM 'C:\sql\dwh_project\datasets\source_erp\cust_az12.csv'
+		FROM 'D:\DataWarehouse Project\Dataset\source_erp\CUST_AZ12.csv'
 		WITH (
 			FIRSTROW = 2,          -- Skip the header row in the CSV file
 			FIELDTERMINATOR = ',', -- Columns are separated by commas
@@ -167,7 +167,7 @@ BEGIN
 		PRINT '>> Inserting Data Into: bronze.erp_px_cat_g1v2';
 		-- Bulk insert raw product category data from CSV; skip row 1 (header), use comma as delimiter
 		BULK INSERT bronze.erp_px_cat_g1v2
-		FROM 'C:\sql\dwh_project\datasets\source_erp\px_cat_g1v2.csv'
+		FROM 'D:\DataWarehouse Project\Dataset\source_erp\PX_CAT_G1V2.csv'
 		WITH (
 			FIRSTROW = 2,          -- Skip the header row in the CSV file
 			FIELDTERMINATOR = ',', -- Columns are separated by commas
