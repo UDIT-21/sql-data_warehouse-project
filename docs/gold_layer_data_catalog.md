@@ -1,266 +1,460 @@
+# 📚 Gold Layer Data Catalog
 
-
----
-
-# Data Catalog — Gold Layer
-
-### Data Warehouse | Star Schema | Business-Ready Analytics
-
-**Governance & Project Metadata**
-
-* **Project Domain:** Enterprise Sales & Analytics
-* **Architecture:** Medallion (Bronze, Silver, Gold)
-* **Data Stewards:** Data Engineering Team
-* **Refresh SLA:** Real-time computation (Gold views reflect the latest Silver state)
-* **Environment:** Production (`prod_dw.gold`)
+> Business-ready analytics layer built on a Star Schema model using SQL Server Views.
 
 ---
 
-## Why a Data Catalog?
+# Table of Contents
 
-In any multi-layer data warehouse architecture, raw data passes through several stages of transformation before it becomes consumable. By the time data reaches the **Gold layer**, it has been:
+* [Overview](#overview)
+* [Governance Metadata](#governance-metadata)
+* [Why a Data Catalog?](#why-a-data-catalog)
+* [Why Document the Gold Layer?](#why-document-the-gold-layer)
+* [General Modeling Standards & Business Rules](#general-modeling-standards--business-rules)
+* [Architecture Overview](#architecture-overview)
+* [Gold Layer Objects](#gold-layer-objects)
 
-* Ingested from source systems (Bronze)
-* Cleaned, deduped, standardized, and validated (Silver)
-* Joined, enriched, and modeled into a **Star Schema** (Gold)
-
-Without a catalog, the Gold layer is a black box. Analysts, BI developers, and data consumers are left guessing: *What does `customer_key` mean? Where does `gender` actually come from? Why is `prd_end_dt` sometimes NULL?* These questions cost time, introduce errors, and erode trust in data.
-
-**A data catalog answers those questions definitively** — it documents not just what columns exist, but what they mean, where they came from, and how they should be used.
-
----
-
-## Why Document the Gold Layer Specifically?
-
-The Gold layer is the **only layer** that business users, analysts, and BI tools directly query. Bronze is raw and unsafe to expose. Silver is clean but technical and normalized. Gold is the presentation layer — optimized for reporting and analytics via a Star Schema (fact + dimension tables).
-
-Documenting Gold specifically matters because:
-
-| Reason | Implication |
-| --- | --- |
-| **Consumer-Facing Layer** | Every dashboard, report, or ad-hoc query starts here. Misunderstood columns lead to wrong insights. |
-| **Surrogate Keys Replace Natural Keys** | `customer_key` and `product_key` are system-generated integers. They mean nothing without documentation. |
-| **Baked-in Business Logic** | Gender resolution, cost fallback to 0, and SCD (Slowly Changing Dimension) filtering are invisible without a catalog. |
-| **Hidden Multi-Source Joins** | Gold views silently combine CRM and ERP data. Consumers need to trace lineage via this document. |
-| **Database Engine Limitations** | Most BI tools and SQL IDEs show column names but not semantic meaning, origin, or transformation logic. |
-
-> **Bottom Line:** The Gold layer is where SQL ends and storytelling begins. This catalog is that story.
+  * [dim_customers](#golddim_customers)
+  * [dim_products](#golddim_products)
+  * [fact_sales](#goldfact_sales)
+* [Data Lineage](#data-lineage)
+* [Star Schema](#star-schema)
 
 ---
 
-## General Modeling Standards & Business Rules
+# Overview
 
-To ensure consistency across reports, the Gold layer strictly adheres to the following data modeling standards:
+The Gold Layer represents the final presentation layer of the Data Warehouse.
 
-* **Unknown/Missing Dimensions:** Any fact record lacking a valid dimension mapping is assigned a surrogate key of `-1`. The corresponding dimension tables contain a `-1` row with descriptive values like `Unknown` or `Not Applicable`.
-* **Currency:** All monetary values (`sales_amount`, `cost`, `price`) are standardized to **USD**.
-* **Dates:** All date fields follow the ISO-8601 standard (`YYYY-MM-DD`).
-* **Active Records Only:** Dimension views in the Gold layer currently only expose the *active* version of a record (SCD Type 1 view over SCD Type 2 underlying Silver tables).
+It exposes curated business entities through a Star Schema consisting of:
+
+* Customer Dimension
+* Product Dimension
+* Sales Fact Table
+
+All Gold objects are implemented as SQL Views and are derived directly from Silver Layer tables.
+
+The purpose of the Gold Layer is to provide:
+
+* Business-ready analytics
+* Consistent reporting
+* Simplified querying
+* Trusted metrics
+* Semantic business definitions
 
 ---
 
-## Architecture Overview
+# Governance Metadata
+
+| Attribute         | Value                              |
+| ----------------- | ---------------------------------- |
+| Domain            | Enterprise Sales & Analytics       |
+| Architecture      | Medallion (Bronze → Silver → Gold) |
+| Environment       | Production (`prod_dw.gold`)        |
+| Data Steward      | Data Engineering Team              |
+| Refresh Strategy  | Query-time computation             |
+| Data Model        | Star Schema                        |
+| Consumption Layer | BI & Analytics                     |
+
+---
+
+# Why a Data Catalog?
+
+A Data Catalog serves as the business dictionary of the Data Warehouse.
+
+As data flows through the Medallion Architecture:
 
 ```text
-Source Systems (CSV, API)
+Sources
+   │
+   ▼
+Bronze
+   │
+   ▼
+Silver
+   │
+   ▼
+Gold
+```
+
+it undergoes multiple transformations.
+
+By the time data reaches the Gold Layer, it has been:
+
+* Ingested from source systems
+* Cleaned and validated
+* Standardized
+* Enriched
+* Modeled into analytical structures
+
+Without proper documentation, users may struggle to understand:
+
+* Column meanings
+* Data lineage
+* Business logic
+* Surrogate keys
+* Data quality assumptions
+
+This catalog provides a trusted reference for all consumers of the Gold Layer.
+
+---
+
+# Why Document the Gold Layer?
+
+The Gold Layer is the primary interface between the Data Warehouse and business users.
+
+| Reason                   | Business Impact                            |
+| ------------------------ | ------------------------------------------ |
+| Consumer-facing layer    | Every dashboard and report originates here |
+| Surrogate keys           | Require documentation for interpretation   |
+| Embedded business logic  | Must be transparent to consumers           |
+| Multi-source integration | Lineage must remain visible                |
+| Self-service analytics   | Improves trust and usability               |
+
+> The Gold Layer is where raw data becomes business insight.
+
+---
+
+# General Modeling Standards & Business Rules
+
+## Unknown Dimension Members
+
+Records with missing dimension references receive:
+
+```text
+Surrogate Key = -1
+```
+
+Dimension tables contain corresponding records such as:
+
+```text
+Unknown
+Not Applicable
+Missing
+```
+
+---
+
+## Currency Standardization
+
+All monetary values are standardized to:
+
+```text
+USD
+```
+
+Applicable fields:
+
+* sales_amount
+* price
+* cost
+
+---
+
+## Date Format
+
+All date columns follow ISO-8601 format:
+
+```text
+YYYY-MM-DD
+```
+
+---
+
+## Active Records
+
+Gold dimensions expose only active records.
+
+Current implementation follows:
+
+```text
+SCD Type 1 Presentation Layer
+```
+
+Historical tracking remains available within Silver tables.
+
+---
+
+# Architecture Overview
+
+```text
+CSV Source Files
        │
        ▼
 ┌─────────────┐
-│   BRONZE    │  Raw ingestion — no transformation, full fidelity
-│  (Tables)   │  Loaded via: bronze.load_bronze
+│   BRONZE    │
+│ Raw Tables  │
 └──────┬──────┘
        │
        ▼
 ┌─────────────┐
-│   SILVER    │  Cleaned, standardized, deduplicated, type-cast
-│  (Tables)   │  Loaded via: silver.load_silver
+│   SILVER    │
+│ Cleansed    │
+│ Tables      │
 └──────┬──────┘
        │
        ▼
 ┌─────────────┐
-│    GOLD     │  Star Schema — business-ready, analytical
-│   (Views)   │  Queryable directly — no load procedure needed
-└─────────────┘
-
+│    GOLD     │
+│ SQL Views   │
+└──────┬──────┘
+       │
+       ▼
+ BI / Analytics
 ```
 
-**Gold layer objects are SQL Views** — they do not store data physically. They compute on-the-fly from Silver tables. This ensures Gold always reflects the latest Silver state without requiring a separate ETL orchestration run.
+---
+
+# Gold Layer Objects
+
+| Object Name          | Type | Description        | Grain                        |
+| -------------------- | ---- | ------------------ | ---------------------------- |
+| `gold.dim_customers` | View | Customer Dimension | One row per customer         |
+| `gold.dim_products`  | View | Product Dimension  | One row per active product   |
+| `gold.fact_sales`    | View | Sales Fact Table   | One row per sales order line |
 
 ---
 
-## Gold Layer Objects
+# gold.dim_customers
 
-| Object | Type | Role in Star Schema | Row Grain |
-| --- | --- | --- | --- |
-| `gold.dim_customers` | View | Customer Dimension | One row per unique customer |
-| `gold.dim_products` | View | Product Dimension | One row per currently active product version |
-| `gold.fact_sales` | View | Central Fact Table | One row per sales order line |
+## Purpose
+
+Provides a unified customer record by combining CRM and ERP customer data.
 
 ---
 
-## `gold.dim_customers`
+## Source Tables
 
-### Purpose
-
-The customer dimension consolidates identity, demographic, and location data from two source systems — the CRM (primary) and ERP (supplementary). It provides a single, clean, deduplicated record per customer.
-
-### Source Tables (Silver Layer)
-
-| Silver Table | Contribution |
-| --- | --- |
-| `silver.crm_cust_info` | Primary source: identity fields, marital status, gender, create date |
-| `silver.erp_cust_az12` | Supplementary: birthdate, fallback gender |
-| `silver.erp_loc_a101` | Supplementary: country of residence |
-
-### Column Reference
-
-| Column Name | Data Type | Description | Source |
-| --- | --- | --- | --- |
-| `customer_key` | INT | **Primary Surrogate Key.** System-generated integer. | Generated |
-| `customer_id` | INT | **Natural key.** Original numeric ID from the CRM. | `crm_cust_info.cst_id` |
-| `customer_number` | NVARCHAR(50) | **Business identifier.** Human-readable cross-reference code. | `crm_cust_info.cst_key` |
-| `first_name` | NVARCHAR(50) | Customer's first name. | `crm_cust_info.cst_firstname` |
-| `last_name` | NVARCHAR(50) | Customer's last name. | `crm_cust_info.cst_lastname` |
-| `country` | NVARCHAR(50) | Country of residence (Standardized to ISO Alpha-3). | `erp_loc_a101.cntry` |
-| `marital_status` | NVARCHAR(50) | Standardized to `Married`, `Single`, or `Unknown`. | `crm_cust_info.cst_marital_status` |
-| `gender` | NVARCHAR(50) | Standardized to `M`, `F`, or `U`. | `crm_cust_info.cst_gndr` / `erp_cust_az12.gen` |
-| `birthdate` | DATE | Customer's date of birth. | `erp_cust_az12.bdate` |
-| `create_date` | DATE | Date the record was created in the CRM. | `crm_cust_info.cst_create_date` |
-
-**Data Quality Constraints:**
-
-* `customer_key` is unique and `NOT NULL`.
-* `birthdate` must be >= `1900-01-01` and <= Current Date.
+| Table                  | Purpose                                |
+| ---------------------- | -------------------------------------- |
+| `silver.crm_cust_info` | Customer master data                   |
+| `silver.erp_cust_az12` | Birthdate and supplementary attributes |
+| `silver.erp_loc_a101`  | Geographic information                 |
 
 ---
 
-## `gold.dim_products`
+## Columns
 
-### Purpose
-
-Provides a clean, enriched view of active products, combining CRM product master data with ERP category hierarchies. Expired product versions are excluded.
-
-### Source Tables (Silver Layer)
-
-| Silver Table | Contribution |
-| --- | --- |
-| `silver.crm_prd_info` | Primary source: product attributes, cost, line, dates |
-| `silver.erp_px_cat_g1v2` | Supplementary: category hierarchy (category, subcat, maintenance) |
-
-### Column Reference
-
-| Column Name | Data Type | Description | Source |
-| --- | --- | --- | --- |
-| `product_key` | INT | **Primary Surrogate Key.** System-generated integer. | Generated |
-| `product_id` | INT | **Natural key.** Original numeric ID from CRM. | `crm_prd_info.prd_id` |
-| `product_number` | NVARCHAR(50) | **Business identifier.** Human-readable code. | `crm_prd_info.prd_key` |
-| `product_name` | NVARCHAR(50) | Descriptive name of the product. | `crm_prd_info.prd_nm` |
-| `category_id` | NVARCHAR(50) | Derived category identifier extracted from CRM product key. | `crm_prd_info.cat_id` |
-| `category` | NVARCHAR(50) | Top-level product category (e.g., `Bikes`). | `erp_px_cat_g1v2.cat` |
-| `subcategory` | NVARCHAR(50) | Sub-category within the top-level (e.g., `Road Bikes`). | `erp_px_cat_g1v2.subcat` |
-| `maintenance` | NVARCHAR(50) | Maintenance classification flag (`Yes`/`No`). | `erp_px_cat_g1v2.maintenance` |
-| `cost` | DECIMAL(18,2) | Manufacturing/acquisition cost of the product. | `crm_prd_info.prd_cost` |
-| `product_line` | NVARCHAR(50) | Standardized product line label. | `crm_prd_info.prd_line` |
-| `start_date` | DATE | Date this version of the product became active. | `crm_prd_info.prd_start_dt` |
-
-**Data Quality Constraints:**
-
-* `product_key` is unique and `NOT NULL`.
-* `cost` must be >= 0.
+| Column          | Data Type    | Description                 |
+| --------------- | ------------ | --------------------------- |
+| customer_key    | INT          | Surrogate primary key       |
+| customer_id     | INT          | CRM customer identifier     |
+| customer_number | NVARCHAR(50) | Business customer code      |
+| first_name      | NVARCHAR(50) | First name                  |
+| last_name       | NVARCHAR(50) | Last name                   |
+| country         | NVARCHAR(50) | Country of residence        |
+| marital_status  | NVARCHAR(50) | Standardized marital status |
+| gender          | NVARCHAR(50) | Standardized gender         |
+| birthdate       | DATE         | Customer date of birth      |
+| create_date     | DATE         | CRM creation date           |
 
 ---
 
-## `gold.fact_sales`
+## Data Quality Rules
 
-### Purpose
-
-The central fact table of the Star Schema. It records every sales order line transaction. This is the primary table for sales volume, revenue, and pricing analytics.
-
-### Source Tables
-
-| Source | Contribution |
-| --- | --- |
-| `silver.crm_sales_details` | Transactional fields: order number, dates, sales amount, quantity, price |
-| `gold.dim_products` | Resolves `sls_prd_key` (business key) → `product_key` (surrogate) |
-| `gold.dim_customers` | Resolves `sls_cust_id` (natural key) → `customer_key` (surrogate) |
-
-### Column Reference
-
-| Column Name | Data Type | Description | Source |
-| --- | --- | --- | --- |
-| `order_number` | NVARCHAR(50) | **Degenerate dimension key.** Unique sales order identifier. | `crm_sales_details.sls_ord_num` |
-| `product_key` | INT | **Foreign key.** Identifies the product sold. | `dim_products.product_key` |
-| `customer_key` | INT | **Foreign key.** Identifies the purchasing customer. | `dim_customers.customer_key` |
-| `order_date` | DATE | The date the sales order was placed. | `crm_sales_details.sls_order_dt` |
-| `shipping_date` | DATE | The date the order was shipped from the warehouse. | `crm_sales_details.sls_ship_dt` |
-| `due_date` | DATE | The expected delivery date for the order. | `crm_sales_details.sls_due_dt` |
-| `sales_amount` | DECIMAL(18,2) | Total monetary value (`quantity` * `price`). | `crm_sales_details.sls_sales` |
-| `quantity` | INT | Number of product units in the order line. | `crm_sales_details.sls_quantity` |
-| `price` | DECIMAL(18,2) | Unit price of the product at the time of the order. | `crm_sales_details.sls_price` |
-
-**Data Quality Constraints:**
-
-* `order_number`, `product_key`, and `customer_key` combined form a unique composite grain.
-* Missing dimensional links default to `-1` (Never `NULL`).
-* `sales_amount` must precisely equal `quantity * price`.
+* `customer_key` must be unique.
+* `customer_key` cannot be NULL.
+* Birthdate must be valid.
+* Duplicate customers are removed.
 
 ---
 
-## Data Lineage (Data Flow)
+# gold.dim_products
 
-The data warehouse follows a Medallion Architecture. The diagram below illustrates the flow from external source files through the Bronze and Silver tables, ultimately combining into Gold layer views.
+## Purpose
+
+Provides enriched product information by combining CRM product data with ERP category hierarchies.
+
+---
+
+## Source Tables
+
+| Table                    | Purpose             |
+| ------------------------ | ------------------- |
+| `silver.crm_prd_info`    | Product master data |
+| `silver.erp_px_cat_g1v2` | Category hierarchy  |
+
+---
+
+## Columns
+
+| Column         | Data Type     | Description                 |
+| -------------- | ------------- | --------------------------- |
+| product_key    | INT           | Surrogate primary key       |
+| product_id     | INT           | CRM product identifier      |
+| product_number | NVARCHAR(50)  | Business product code       |
+| product_name   | NVARCHAR(50)  | Product name                |
+| category_id    | NVARCHAR(50)  | Product category identifier |
+| category       | NVARCHAR(50)  | Product category            |
+| subcategory    | NVARCHAR(50)  | Product subcategory         |
+| maintenance    | NVARCHAR(50)  | Maintenance flag            |
+| cost           | DECIMAL(18,2) | Product cost                |
+| product_line   | NVARCHAR(50)  | Product line                |
+| start_date     | DATE          | Product activation date     |
+
+---
+
+## Data Quality Rules
+
+* `product_key` must be unique.
+* `product_key` cannot be NULL.
+* Cost must be greater than or equal to zero.
+
+---
+
+# gold.fact_sales
+
+## Purpose
+
+Stores sales transaction data at the sales-order-line grain.
+
+This table supports:
+
+* Revenue analysis
+* Product performance analysis
+* Customer analytics
+* Operational reporting
+
+---
+
+## Source Tables
+
+| Table                      | Purpose            |
+| -------------------------- | ------------------ |
+| `silver.crm_sales_details` | Sales transactions |
+| `gold.dim_products`        | Product lookup     |
+| `gold.dim_customers`       | Customer lookup    |
+
+---
+
+## Columns
+
+| Column        | Data Type     | Description            |
+| ------------- | ------------- | ---------------------- |
+| order_number  | NVARCHAR(50)  | Sales order identifier |
+| product_key   | INT           | Product foreign key    |
+| customer_key  | INT           | Customer foreign key   |
+| order_date    | DATE          | Order date             |
+| shipping_date | DATE          | Shipping date          |
+| due_date      | DATE          | Due date               |
+| sales_amount  | DECIMAL(18,2) | Total sales amount     |
+| quantity      | INT           | Quantity sold          |
+| price         | DECIMAL(18,2) | Unit price             |
+
+---
+
+## Data Quality Rules
+
+* Composite grain:
+
+  * order_number
+  * product_key
+  * customer_key
+* Foreign keys never contain NULL values.
+* Missing dimensions map to surrogate key `-1`.
+* Sales amount must equal quantity × price.
+
+---
+
+# Data Lineage
 
 ```text
-=============================================================================================
- SOURCES                  BRONZE LAYER               SILVER LAYER               GOLD LAYER
-=============================================================================================
+CRM Customer Data
+        │
+        ▼
+silver.crm_cust_info
+        │
+        ▼
+gold.dim_customers
 
-📁 CRM
- └── sales_details ────> crm_sales_details ───────> crm_sales_details ───────> fact_sales
+ERP Customer Data
+        │
+        ▼
+silver.erp_cust_az12
+        │
+        ▼
+gold.dim_customers
 
-📁 CRM
- └── cust_info ────────> crm_cust_info ───────────> crm_cust_info ─────────┐
-                                                                           ├─> dim_customers
-📁 ERP                                                                     │
- ├── erp_cust_az12 ────> erp_cust_az12 ───────────> erp_cust_az12 ─────────┤
- └── erp_loc_a101  ────> erp_loc_a101  ───────────> erp_loc_a101  ─────────┘
+ERP Location Data
+        │
+        ▼
+silver.erp_loc_a101
+        │
+        ▼
+gold.dim_customers
 
-📁 CRM
- └── prd_info  ────────> crm_prd_info  ───────────> crm_prd_info  ─────────┐
-                                                                           ├─> dim_products
-📁 ERP                                                                     │
- └── erp_px_cat_g1v2 ──> erp_px_cat_g1v2 ─────────> erp_px_cat_g1v2 ───────┘
 
-=============================================================================================
+CRM Product Data
+        │
+        ▼
+silver.crm_prd_info
+        │
+        ▼
+gold.dim_products
 
+ERP Category Data
+        │
+        ▼
+silver.erp_px_cat_g1v2
+        │
+        ▼
+gold.dim_products
+
+
+CRM Sales Data
+        │
+        ▼
+silver.crm_sales_details
+        │
+        ▼
+gold.fact_sales
 ```
 
 ---
 
-## Sales Data Mart (Entity Relationship)
+# Star Schema
 
-Below is the conceptual Star Schema structure connecting our dimensions to the central fact table.
+```mermaid
+erDiagram
 
-```text
-┌──────────────────────┐              ┌──────────────────────┐              ┌──────────────────────┐
-│  gold.dim_customers  │              │   gold.fact_sales    │              │  gold.dim_products   │
-├──────────────────────┤              ├──────────────────────┤              ├──────────────────────┤
-│ PK customer_key      │ 1          * │ order_number         │ * 1 │ PK product_key       │
-├──────────────────────┤──────────────┤ FK1 product_key      ├──────────────├──────────────────────┤
-│    customer_id       │              │ FK2 customer_key     │              │    product_id        │
-│    customer_number   │              │ order_date           │              │    product_number    │
-│    first_name        │              │ shipping_date        │              │    product_name      │
-│    last_name         │              │ due_date             │              │    category_id       │
-│    country           │              │ sales_amount         │              │    category          │
-│    marital_status    │              │ quantity             │              │    subcategory       │
-│    gender            │              │ price                │              │    maintenance       │
-│    birthdate         │              └───────────┬──────────┘              │    cost              │
-└──────────────────────┘                          │                         │    product_line      │
-                                                  │                         │    start_date        │
-                                         [ Sales Calculation ]              └──────────────────────┘
-                                        Sales = Quantity * Price                                    
+    DIM_CUSTOMERS ||--o{ FACT_SALES : purchases
+    DIM_PRODUCTS  ||--o{ FACT_SALES : sold_as
 
+    DIM_CUSTOMERS {
+        int customer_key PK
+        int customer_id
+        string customer_number
+        string first_name
+        string last_name
+    }
+
+    DIM_PRODUCTS {
+        int product_key PK
+        int product_id
+        string product_name
+        string category
+    }
+
+    FACT_SALES {
+        string order_number
+        int customer_key FK
+        int product_key FK
+        decimal sales_amount
+        int quantity
+        decimal price
+    }
 ```
 
 ---
 
+# Summary
+
+The Gold Layer provides a trusted, business-friendly analytical model built on top of cleansed Silver Layer data.
+
+Key characteristics:
+
+* Star Schema design
+* Query-time computation through SQL Views
+* Business-ready dimensions and facts
+* Consistent governance standards
+* Simplified consumption for BI and analytics tools
