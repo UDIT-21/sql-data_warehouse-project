@@ -1,6 +1,7 @@
 Here is the complete, updated `Data Catalog.md` file. It incorporates the Mermaid.js diagrams for both the Architecture Overview and Data Lineage/Star Schema, and I have completely removed the "Transformation Notes" column from all the data dictionary tables as requested.
 
-```markdown
+---
+
 # Data Catalog — Gold Layer
 ### Data Warehouse | Star Schema | Business-Ready Analytics
 
@@ -52,9 +53,9 @@ graph TD
     %% Define Flows & Transformations
     Source -->|Raw ingestion — no transformation, full fidelity| Bronze
     Bronze -->|Cleaned, standardized, deduplicated, type-cast| Silver
-    Silver -->|Star Schema — business-ready, analytical| Gold
-
+    Silver -->|Star Schema — business-ready, analytical| Gold\
 ```
+---
 
 **Gold layer objects are SQL Views** — they do not store data. They compute on-the-fly from Silver tables every time they are queried. This ensures Gold always reflects the latest Silver state without a separate ETL run.
 
