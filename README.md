@@ -1,50 +1,89 @@
 # 🏭 Modern Data Warehouse: SQL Server + Medallion Architecture
 
-> An end-to-end **Data Engineering** portfolio project implementing a production-grade Data Warehouse using the **Medallion Architecture** (Bronze ➔ Silver ➔ Gold). Built entirely on SQL Server, transforming raw CSVs into a business-ready Star Schema.
+> An end-to-end **Data Engineering** portfolio project implementing a production-grade Data Warehouse using the **Medallion Architecture** (Bronze → Silver → Gold). Built entirely on SQL Server, transforming raw CSV files into a business-ready Star Schema.
 
-Built alongside the [Data With Baraa](http://bit.ly/3GiCVUE) series, featuring hands-on implementation, custom data catalogs, and interactive documentation.
+Built alongside the Data With Baraa series, featuring hands-on implementation, custom data catalogs, and interactive documentation.
 
 ---
 
 ## 📌 Project Snapshot
 
-| Feature | Specification |
-| :--- | :--- |
-| **Architecture** | Medallion (Bronze, Silver, Gold) |
-| **Data Modeling** | Star Schema (Fact & Dimension views) |
-| **ETL Strategy** | Full Extract · Batch Processing · Truncate & Reload |
-| **SCD Strategy** | Type 1 (Overwrite / No historization) |
-| **Sources** | CRM (`.csv`) & ERP (`.csv`) |
-| **Core Stack** | SQL Server Express, SSMS, Git |
+| Feature           | Specification                                       |
+| ----------------- | --------------------------------------------------- |
+| **Architecture**  | Medallion (Bronze, Silver, Gold)                    |
+| **Data Modeling** | Star Schema (Fact & Dimension Views)                |
+| **ETL Strategy**  | Full Extract · Batch Processing · Truncate & Reload |
+| **SCD Strategy**  | Type 1 (Overwrite / No Historization)               |
+| **Data Sources**  | CRM CSV Files & ERP CSV Files                       |
+| **Core Stack**    | SQL Server Express, SSMS, Git                       |
 
 ---
 
-```markdown
 ## 🏗️ Architecture & Data Flow
 
 Data progresses through three distinct layers, increasing in structure, quality, and business value.
 
 ```text
-[Raw CSVs] ➔ [ 🥉 BRONZE ] ➔ [ 🥈 SILVER ] ➔ [ 🥇 GOLD ] ➔ [ BI / Analytics ]
-
+[Raw CSV Files]
+        │
+        ▼
+ [🥉 BRONZE]
+        │
+        ▼
+ [🥈 SILVER]
+        │
+        ▼
+ [🥇 GOLD]
+        │
+        ▼
+ [BI / Analytics]
 ```
 
-| Layer | Purpose | Object Type | Transformations |
-| --- | --- | --- | --- |
-| **Bronze** | Raw ingestion target. | Tables | None. Full fidelity to source. |
-| **Silver** | Cleansed & conformed data. | Tables | Deduplication, type-casting, null handling, standardization. |
-| **Gold** | Business-ready analytics. | Views | Star Schema joins, aggregations, surrogate keys. |
+### Layer Overview
 
-> **Architectural Note:** The Gold layer utilizes **SQL Views** rather than physical tables to ensure it remains perfectly synchronized with the Silver layer while reducing redundant storage.
+| Layer      | Purpose                         | Object Type | Key Transformations                                               |
+| ---------- | ------------------------------- | ----------- | ----------------------------------------------------------------- |
+| **Bronze** | Raw data ingestion layer        | Tables      | No transformations; preserves source fidelity                     |
+| **Silver** | Cleansed and standardized layer | Tables      | Deduplication, type casting, null handling, data standardization  |
+| **Gold**   | Business-ready analytics layer  | Views       | Star Schema modeling, business calculations, reporting structures |
+
+> **Architectural Note:** The Gold layer uses SQL Views rather than physical tables, ensuring real-time synchronization with the Silver layer while minimizing redundant storage.
 
 ---
 
 ## ⚙️ Technical Implementation
 
-* **Extraction:** Full batch load via `BULK INSERT` from local `.csv` files.
-* **Transformation:** Modular Stored Procedures (`load_bronze`, `load_silver`) enforce strict Separation of Concerns.
-* **Modeling:** Dimensions (`dim_customers`, `dim_products`) and Facts (`fact_sales`) joined via dynamically generated surrogate keys.
-* **Governance:** Strict `snake_case` naming conventions applied across all schemas, tables, and metadata columns (e.g., `dwh_create_date`).
+### Data Extraction
+
+* Full batch ingestion using `BULK INSERT`
+* Source files loaded from local CSV datasets
+* Truncate-and-reload strategy for consistent refreshes
+
+### Data Transformation
+
+* Modular Stored Procedures:
+
+  * `load_bronze`
+  * `load_silver`
+* Clear separation of extraction, cleansing, and transformation logic
+
+### Data Modeling
+
+* Star Schema design
+* Dimension Views:
+
+  * `dim_customers`
+  * `dim_products`
+* Fact Views:
+
+  * `fact_sales`
+* Surrogate keys generated for optimized analytical joins
+
+### Data Governance
+
+* Consistent `snake_case` naming convention
+* Metadata tracking columns included throughout the warehouse
+* Example: `dwh_create_date`
 
 ---
 
@@ -52,43 +91,92 @@ Data progresses through three distinct layers, increasing in structure, quality,
 
 ```text
 data-warehouse-project/
-├── datasets/        # Raw source CRM & ERP data (.csv)
-├── docs/            # Data dictionaries, ERDs, and naming conventions
+│
+├── datasets/
+│   ├── crm/
+│   └── erp/
+│
+├── docs/
+│   ├── data_dictionary.md
+│   ├── naming_conventions.md
+│   └── erd/
+│
 ├── scripts/
-│   ├── bronze/      # DDL & DML for raw ingestion
-│   ├── silver/      # Data cleansing & standardization procedures
-│   └── gold/        # Star schema view definitions
-
-```
-
-```
-
+│   ├── bronze/
+│   │   ├── ddl_bronze.sql
+│   │   └── load_bronze.sql
+│   │
+│   ├── silver/
+│   │   ├── ddl_silver.sql
+│   │   └── load_silver.sql
+│   │
+│   └── gold/
+│       └── create_gold_views.sql
+│
+├── README.md
+└── LICENSE
 ```
 
 ---
 
 ## 🚀 Getting Started
 
-**Prerequisites:**
+### Prerequisites
 
-* [SQL Server Express](https://www.microsoft.com/en-us/sql-server/sql-server-downloads) (Free)
-* [SQL Server Management Studio (SSMS)](https://learn.microsoft.com/en-us/sql/ssms/download-sql-server-management-studio-ssms)
+* SQL Server Express
+* SQL Server Management Studio (SSMS)
 * Git
 
-**Execution Order:**
+### Setup & Execution
 
-1. Run `Create Database_Schemas.sql` to establish the environment.
-2. Execute the **Bronze** DDL & Load procedures.
-3. Execute the **Silver** DDL & Load procedures.
-4. Execute the **Gold** DDL to generate reporting views.
+1. Execute `Create_Database_Schemas.sql`
+2. Run Bronze Layer scripts
+3. Run Silver Layer scripts
+4. Run Gold Layer scripts
+5. Query Gold Views for analytics and reporting
 
 ---
 
-## 🙏 Acknowledgments & License
+## 📊 Data Warehouse Layers
 
-* **Curriculum:** Inspired by and built following [Data With Baraa](http://bit.ly/3GiCVUE).
-* **License:** [MIT License](https://www.google.com/search?q=LICENSE)
+### 🥉 Bronze Layer
 
-```
+* Raw source ingestion
+* No transformations applied
+* Maintains complete source fidelity
 
-```
+### 🥈 Silver Layer
+
+* Data cleansing and validation
+* Standardization and normalization
+* Business-rule enforcement
+
+### 🥇 Gold Layer
+
+* Star Schema presentation layer
+* Fact and Dimension Views
+* Optimized for BI and reporting tools
+
+---
+
+## 🎯 Project Objectives
+
+* Build a scalable SQL Server Data Warehouse
+* Implement Medallion Architecture principles
+* Apply ETL best practices
+* Design analytical Star Schemas
+* Create a business-ready reporting layer
+* Demonstrate real-world Data Engineering workflows
+
+---
+
+## 🙏 Acknowledgments
+
+* **Curriculum:** Inspired by and developed alongside the Data With Baraa Data Engineering Series.
+* **Community:** Thanks to the Data Engineering learning community for insights and best practices.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License**. See the `LICENSE` file for details.
