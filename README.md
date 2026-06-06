@@ -1,6 +1,3 @@
-
-
-```markdown
 # 🏭 Modern Data Warehouse: SQL Server + Medallion Architecture
 
 > An end-to-end **Data Engineering** portfolio project implementing a production-grade Data Warehouse using the **Medallion Architecture** (Bronze ➔ Silver ➔ Gold). Built entirely on SQL Server, transforming raw CSVs into a business-ready Star Schema.
@@ -28,8 +25,6 @@ Data progresses through three distinct layers, increasing in structure, quality,
 
 ```text
 [Raw CSVs] ➔ [ 🥉 BRONZE ] ➔ [ 🥈 SILVER ] ➔ [ 🥇 GOLD ] ➔ [ BI / Analytics ]
-
-```
 
 | Layer | Purpose | Object Type | Transformations |
 | --- | --- | --- | --- |
