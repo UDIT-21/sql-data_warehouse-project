@@ -37,7 +37,6 @@ In short: **the Gold layer is where SQL ends and storytelling begins.** This cat
 
 ## Architecture Overview
 
-```text
 Source Systems (CSV)
        │
        ▼
@@ -168,7 +167,6 @@ The central fact table of the Star Schema. It records every sales order line tra
 
 The data warehouse follows a Medallion Architecture. The diagram below illustrates the exact flow of data from the external source files through the Bronze and Silver tables, ultimately combining into the Gold layer views.
 
-```text
 =============================================================================================
  SOURCES                  BRONZE LAYER               SILVER LAYER               GOLD LAYER
 =============================================================================================
@@ -191,15 +189,12 @@ The data warehouse follows a Medallion Architecture. The diagram below illustrat
 
 =============================================================================================
 
-```
-
 ---
 
 ## Sales Data Mart (Star Schema)
 
 The Gold layer models the integrated data into a standard Star Schema optimized for analytics. Below is the Entity-Relationship structure connecting our dimensions to the central fact table.
 
-```text
 ┌──────────────────────┐              ┌──────────────────────┐              ┌──────────────────────┐
 │  gold.dim_customers  │              │   gold.fact_sales    │              │  gold.dim_products   │
 ├──────────────────────┤              ├──────────────────────┤              ├──────────────────────┤
@@ -220,8 +215,4 @@ The Gold layer models the integrated data into a standard Star Schema optimized 
      [ Single  ]                          Sales = Quantity * price                 [ Yes ]
                                                                                    [ No  ]
 
-```
-
-```
-
-```
+---
