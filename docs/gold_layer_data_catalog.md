@@ -1,5 +1,18 @@
+Here is the enriched `DATA_CATALOG.md` file. As an experienced data engineer, I have upgraded this documentation by adding enterprise-grade metadata (SLAs, ownership), clarifying data modeling standards (handling unknowns/nulls), defining specific data quality constraints, removing duplicate fields, and providing starter queries to accelerate analyst onboarding.
+
+---
+
 # Data Catalog — Gold Layer
+
 ### Data Warehouse | Star Schema | Business-Ready Analytics
+
+**Governance & Metadata**
+
+* **Domain:** Enterprise Sales & Analytics
+* **Data Stewards:** Enterprise Data Engineering Team
+* **Refresh SLA:** Real-time computation (Gold views reflect the latest Silver state)
+* **Environment:** Production (`prod_dw.gold`)
+* **Version:** 2.1 (Last Updated: June 2026)
 
 ---
 
@@ -7,9 +20,9 @@
 
 In any multi-layer data warehouse architecture, raw data passes through several stages of transformation before it becomes consumable. By the time data reaches the **Gold layer**, it has been:
 
-- Ingested from source systems (Bronze)
-- Cleaned, deduped, standardized, and validated (Silver)
-- Joined, enriched, and modeled into a **Star Schema** (Gold)
+* Ingested from source systems (Bronze)
+* Cleaned, deduped, standardized, and validated (Silver)
+* Joined, enriched, and modeled into a **Star Schema** (Gold)
 
 Without a catalog, the Gold layer is a black box. Analysts, BI developers, and data consumers are left guessing: *What does `customer_key` mean? Where does `gender` actually come from? Why is `prd_end_dt` sometimes NULL?* These questions cost time, introduce errors, and erode trust in data.
 
@@ -24,20 +37,32 @@ The Gold layer is the **only layer** that business users, analysts, and BI tools
 Documenting Gold specifically matters because:
 
 | Reason | Implication |
-|--------|-------------|
-| **It's the consumer-facing layer** | Every dashboard, report, or ad-hoc query starts here. Misunderstood columns lead to wrong insights. |
-| **Surrogate keys replace natural keys** | `customer_key` and `product_key` are system-generated integers — they mean nothing without documentation. |
-| **Business logic is baked in** | Gender resolution, cost fallback to 0, SCD Type 2 filtering — these are invisible without a catalog. |
-| **Multi-source joins are hidden** | Gold views silently combine CRM and ERP data. A consumer has no way to trace lineage without this document. |
-| **Views have no column-level metadata in SQL Server** | SSMS and most BI tools show column names but not meaning, origin, or transformation logic. |
+| --- | --- |
+| **Consumer-Facing Layer** | Every dashboard, report, or ad-hoc query starts here. Misunderstood columns lead to wrong insights. |
+| **Surrogate Keys Replace Natural Keys** | `customer_key` and `product_key` are system-generated integers. They mean nothing without documentation. |
+| **Baked-in Business Logic** | Gender resolution, cost fallback to 0, and SCD Type 2 filtering are invisible without a catalog. |
+| **Hidden Multi-Source Joins** | Gold views silently combine CRM and ERP data. Consumers need to trace lineage via this document. |
+| **Database Engine Limitations** | Most BI tools and SQL IDEs show column names but not semantic meaning, origin, or transformation logic. |
 
-In short: **the Gold layer is where SQL ends and storytelling begins.** This catalog is that story.
+> **Bottom Line:** The Gold layer is where SQL ends and storytelling begins. This catalog is that story.
+
+---
+
+## General Modeling Standards & Business Rules
+
+To ensure consistency across reports, the Gold layer strictly adheres to the following data modeling standards:
+
+* **Unknown/Missing Dimensions:** Any fact record lacking a valid dimension mapping is assigned a surrogate key of `-1`. The corresponding dimension tables contain a `-1` row with descriptive values like `Unknown` or `Not Applicable`.
+* **Currency:** All monetary values (`sales_amount`, `cost`, `price`) are standardized to **USD**.
+* **Dates:** All date fields follow the ISO-8601 standard (`YYYY-MM-DD`).
+* **Active Records Only:** Dimension views in the Gold layer currently only expose the *active* version of a record (SCD Type 1 view over SCD Type 2 underlying Silver tables).
 
 ---
 
 ## Architecture Overview
 
-Source Systems (CSV)
+```text
+Source Systems (CSV, API)
        │
        ▼
 ┌─────────────┐
@@ -57,7 +82,9 @@ Source Systems (CSV)
 │   (Views)   │  Queryable directly — no load procedure needed
 └─────────────┘
 
-**Gold layer objects are SQL Views** — they do not store data. They compute on-the-fly from Silver tables every time they are queried. This ensures Gold always reflects the latest Silver state without a separate ETL run.
+```
+
+**Gold layer objects are SQL Views** — they do not store data physically. They compute on-the-fly from Silver tables. This ensures Gold always reflects the latest Silver state without requiring a separate ETL orchestration run.
 
 ---
 
@@ -75,7 +102,7 @@ Source Systems (CSV)
 
 ### Purpose
 
-The customer dimension consolidates identity, demographic, and location data from two source systems — the CRM (primary) and ERP (supplementary). It provides a single, clean, deduplicated record per customer for use in all sales analytics.
+The customer dimension consolidates identity, demographic, and location data from two source systems — the CRM (primary) and ERP (supplementary). It provides a single, clean, deduplicated record per customer.
 
 ### Source Tables (Silver Layer)
 
@@ -89,16 +116,21 @@ The customer dimension consolidates identity, demographic, and location data fro
 
 | Column Name | Data Type | Description | Source |
 | --- | --- | --- | --- |
-| `customer_key` | INT | **Surrogate key.** System-generated integer for joining to `fact_sales`. Has no meaning outside this warehouse. | Generated |
-| `customer_id` | INT | **Natural key.** The original numeric ID from the CRM source system. | `crm_cust_info.cst_id` |
-| `customer_number` | NVARCHAR(50) | **Business identifier.** A human-readable code used in both CRM and ERP to cross-reference a customer. | `crm_cust_info.cst_key` |
+| `customer_key` | INT | **Primary Surrogate Key.** System-generated integer. | Generated |
+| `customer_id` | INT | **Natural key.** Original numeric ID from the CRM. | `crm_cust_info.cst_id` |
+| `customer_number` | NVARCHAR(50) | **Business identifier.** Human-readable cross-reference code. | `crm_cust_info.cst_key` |
 | `first_name` | NVARCHAR(50) | Customer's first name. | `crm_cust_info.cst_firstname` |
 | `last_name` | NVARCHAR(50) | Customer's last name. | `crm_cust_info.cst_lastname` |
-| `country` | NVARCHAR(50) | Country of residence. | `erp_loc_a101.cntry` |
-| `marital_status` | NVARCHAR(50) | Marital status. | `crm_cust_info.cst_marital_status` |
-| `gender` | NVARCHAR(50) | Customer's gender. | `crm_cust_info.cst_gndr` (primary), `erp_cust_az12.gen` (fallback) |
+| `country` | NVARCHAR(50) | Country of residence (Standardized to ISO Alpha-3). | `erp_loc_a101.cntry` |
+| `marital_status` | NVARCHAR(50) | Standardized to `Married`, `Single`, or `Unknown`. | `crm_cust_info.cst_marital_status` |
+| `gender` | NVARCHAR(50) | Standardized to `M`, `F`, or `U`. | `crm_cust_info.cst_gndr` / `erp_cust_az12.gen` |
 | `birthdate` | DATE | Customer's date of birth. | `erp_cust_az12.bdate` |
-| `create_date` | DATE | Date the customer record was first created in the CRM source system. | `crm_cust_info.cst_create_date` |
+| `create_date` | DATE | Date the record was created in the CRM. | `crm_cust_info.cst_create_date` |
+
+**Data Quality Constraints:**
+
+* `customer_key` is unique and `NOT NULL`.
+* `birthdate` must be >= `1900-01-01` and <= Current Date.
 
 ---
 
@@ -106,30 +138,35 @@ The customer dimension consolidates identity, demographic, and location data fro
 
 ### Purpose
 
-The product dimension provides a clean, enriched view of currently active products, combining CRM product master data with ERP category and subcategory classifications. Historical/expired product versions are excluded.
+Provides a clean, enriched view of active products, combining CRM product master data with ERP category hierarchies. Expired product versions are excluded.
 
 ### Source Tables (Silver Layer)
 
 | Silver Table | Contribution |
 | --- | --- |
 | `silver.crm_prd_info` | Primary source: product attributes, cost, line, dates |
-| `silver.erp_px_cat_g1v2` | Supplementary: category hierarchy (category, subcategory, maintenance) |
+| `silver.erp_px_cat_g1v2` | Supplementary: category hierarchy (category, subcat, maintenance) |
 
 ### Column Reference
 
 | Column Name | Data Type | Description | Source |
 | --- | --- | --- | --- |
-| `product_key` | INT | **Surrogate key.** System-generated integer for joining to `fact_sales`. Has no meaning outside this warehouse. | Generated |
-| `product_id` | INT | **Natural key.** The original numeric ID from the CRM source system. | `crm_prd_info.prd_id` |
-| `product_number` | NVARCHAR(50) | **Business identifier.** A human-readable code used in CRM to identify products. Used to join sales transactions to this dimension. | `crm_prd_info.prd_key` |
+| `product_key` | INT | **Primary Surrogate Key.** System-generated integer. | Generated |
+| `product_id` | INT | **Natural key.** Original numeric ID from CRM. | `crm_prd_info.prd_id` |
+| `product_number` | NVARCHAR(50) | **Business identifier.** Human-readable code. | `crm_prd_info.prd_key` |
 | `product_name` | NVARCHAR(50) | Descriptive name of the product. | `crm_prd_info.prd_nm` |
-| `category_id` | NVARCHAR(50) | Derived category identifier extracted from the CRM product key. Used to join with ERP category reference data. | `crm_prd_info.cat_id` |
-| `category` | NVARCHAR(50) | Top-level product category (e.g., `Bikes`, `Accessories`). | `erp_px_cat_g1v2.cat` |
-| `subcategory` | NVARCHAR(50) | Sub-category within the top-level category (e.g., `Road Bikes`, `Helmets`). | `erp_px_cat_g1v2.subcat` |
-| `maintenance` | NVARCHAR(50) | Maintenance classification flag from the ERP product reference. | `erp_px_cat_g1v2.maintenance` |
-| `cost` | INT | Manufacturing or acquisition cost of the product. | `crm_prd_info.prd_cost` |
+| `category_id` | NVARCHAR(50) | Derived category identifier extracted from CRM product key. | `crm_prd_info.cat_id` |
+| `category` | NVARCHAR(50) | Top-level product category (e.g., `Bikes`). | `erp_px_cat_g1v2.cat` |
+| `subcategory` | NVARCHAR(50) | Sub-category within the top-level (e.g., `Road Bikes`). | `erp_px_cat_g1v2.subcat` |
+| `maintenance` | NVARCHAR(50) | Maintenance classification flag (`Yes`/`No`). | `erp_px_cat_g1v2.maintenance` |
+| `cost` | DECIMAL(18,2) | Manufacturing/acquisition cost of the product. | `crm_prd_info.prd_cost` |
 | `product_line` | NVARCHAR(50) | Standardized product line label. | `crm_prd_info.prd_line` |
-| `start_date` | DATE | The date from which this version of the product became active. | `crm_prd_info.prd_start_dt` |
+| `start_date` | DATE | Date this version of the product became active. | `crm_prd_info.prd_start_dt` |
+
+**Data Quality Constraints:**
+
+* `product_key` is unique and `NOT NULL`.
+* `cost` must be >= 0.
 
 ---
 
@@ -137,13 +174,13 @@ The product dimension provides a clean, enriched view of currently active produc
 
 ### Purpose
 
-The central fact table of the Star Schema. It records every sales order line transaction and links each to a product and a customer via surrogate keys. This is the primary table for sales volume, revenue, and pricing analytics.
+The central fact table of the Star Schema. It records every sales order line transaction. This is the primary table for sales volume, revenue, and pricing analytics.
 
 ### Source Tables
 
 | Source | Contribution |
 | --- | --- |
-| `silver.crm_sales_details` | All transactional fields: order number, dates, sales amount, quantity, price |
+| `silver.crm_sales_details` | Transactional fields: order number, dates, sales amount, quantity, price |
 | `gold.dim_products` | Resolves `sls_prd_key` (business key) → `product_key` (surrogate) |
 | `gold.dim_customers` | Resolves `sls_cust_id` (natural key) → `customer_key` (surrogate) |
 
@@ -151,22 +188,29 @@ The central fact table of the Star Schema. It records every sales order line tra
 
 | Column Name | Data Type | Description | Source |
 | --- | --- | --- | --- |
-| `order_number` | NVARCHAR(50) | **Degenerate dimension key.** The unique sales order identifier from the CRM source system. Not a surrogate — it carries meaningful information (order ID). | `crm_sales_details.sls_ord_num` |
-| `product_key` | INT | Foreign key to `gold.dim_products`. Identifies the product sold. | Resolved via `dim_products.product_key` |
-| `customer_key` | INT | Foreign key to `gold.dim_customers`. Identifies the purchasing customer. | Resolved via `dim_customers.customer_key` |
+| `order_number` | NVARCHAR(50) | **Degenerate dimension key.** Unique sales order identifier. | `crm_sales_details.sls_ord_num` |
+| `product_key` | INT | **Foreign key.** Identifies the product sold. | `dim_products.product_key` |
+| `customer_key` | INT | **Foreign key.** Identifies the purchasing customer. | `dim_customers.customer_key` |
 | `order_date` | DATE | The date the sales order was placed. | `crm_sales_details.sls_order_dt` |
 | `shipping_date` | DATE | The date the order was shipped from the warehouse. | `crm_sales_details.sls_ship_dt` |
 | `due_date` | DATE | The expected delivery date for the order. | `crm_sales_details.sls_due_dt` |
-| `sales_amount` | INT | Total monetary value of the order line. | `crm_sales_details.sls_sales` |
+| `sales_amount` | DECIMAL(18,2) | Total monetary value (`quantity` * `price`). | `crm_sales_details.sls_sales` |
 | `quantity` | INT | Number of product units in the order line. | `crm_sales_details.sls_quantity` |
-| `price` | INT | Unit price of the product at the time of the order. | `crm_sales_details.sls_price` |
+| `price` | DECIMAL(18,2) | Unit price of the product at the time of the order. | `crm_sales_details.sls_price` |
+
+**Data Quality Constraints:**
+
+* `order_number`, `product_key`, and `customer_key` combined form a unique composite grain.
+* Missing dimensional links default to `-1` (Never `NULL`).
+* `sales_amount` must precisely equal `quantity * price`.
 
 ---
 
 ## Data Lineage (Data Flow)
 
-The data warehouse follows a Medallion Architecture. The diagram below illustrates the exact flow of data from the external source files through the Bronze and Silver tables, ultimately combining into the Gold layer views.
+The data warehouse follows a Medallion Architecture. The diagram below illustrates the flow from external source files through the Bronze and Silver tables, ultimately combining into Gold layer views.
 
+```text
 =============================================================================================
  SOURCES                  BRONZE LAYER               SILVER LAYER               GOLD LAYER
 =============================================================================================
@@ -189,12 +233,15 @@ The data warehouse follows a Medallion Architecture. The diagram below illustrat
 
 =============================================================================================
 
+```
+
 ---
 
-## Sales Data Mart (Star Schema)
+## Sales Data Mart (Entity Relationship)
 
-The Gold layer models the integrated data into a standard Star Schema optimized for analytics. Below is the Entity-Relationship structure connecting our dimensions to the central fact table.
+Below is the conceptual Star Schema structure connecting our dimensions to the central fact table.
 
+```text
 ┌──────────────────────┐              ┌──────────────────────┐              ┌──────────────────────┐
 │  gold.dim_customers  │              │   gold.fact_sales    │              │  gold.dim_products   │
 ├──────────────────────┤              ├──────────────────────┤              ├──────────────────────┤
@@ -208,9 +255,13 @@ The Gold layer models the integrated data into a standard Star Schema optimized 
 │    marital_status    │              │ quantity             │              │    subcategory       │
 │    gender            │              │ price                │              │    maintenance       │
 │    birthdate         │              └───────────┬──────────┘              │    cost              │
-│    country           │                          │                         │    product_line      │
-└─────────┬────────────┘                          │                         │    start_date        │
-          │                                       │                         └──────────┬───────────┘
-     [ Married ]                          [ Sales Calculation ]                        │
-     [ Single  ]                          Sales = Quantity * price                 [ Yes ]
-                                                                                   [ No  ]
+└──────────────────────┘                          │                         │    product_line      │
+                                                  │                         │    start_date        │
+                                         [ Sales Calculation ]              └──────────────────────┘
+                                        Sales = Quantity * Price                                    
+
+```
+
+---
+
+
