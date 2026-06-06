@@ -1,5 +1,3 @@
-Here is the enriched `DATA_CATALOG.md` file. As an experienced data engineer, I have upgraded this documentation by adding enterprise-grade metadata (SLAs, ownership), clarifying data modeling standards (handling unknowns/nulls), defining specific data quality constraints, removing duplicate fields, and providing starter queries to accelerate analyst onboarding.
-
 ---
 
 # Data Catalog — Gold Layer
