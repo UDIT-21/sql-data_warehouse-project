@@ -1,16 +1,18 @@
+
+
 ---
 
 # Data Catalog — Gold Layer
 
 ### Data Warehouse | Star Schema | Business-Ready Analytics
 
-**Governance & Metadata**
+**Governance & Project Metadata**
 
-* **Domain:** Enterprise Sales & Analytics
-* **Data Stewards:** Enterprise Data Engineering Team
+* **Project Domain:** Enterprise Sales & Analytics
+* **Architecture:** Medallion (Bronze, Silver, Gold)
+* **Data Stewards:** Data Engineering Team
 * **Refresh SLA:** Real-time computation (Gold views reflect the latest Silver state)
 * **Environment:** Production (`prod_dw.gold`)
-* **Version:** 2.1 (Last Updated: June 2026)
 
 ---
 
@@ -38,7 +40,7 @@ Documenting Gold specifically matters because:
 | --- | --- |
 | **Consumer-Facing Layer** | Every dashboard, report, or ad-hoc query starts here. Misunderstood columns lead to wrong insights. |
 | **Surrogate Keys Replace Natural Keys** | `customer_key` and `product_key` are system-generated integers. They mean nothing without documentation. |
-| **Baked-in Business Logic** | Gender resolution, cost fallback to 0, and SCD Type 2 filtering are invisible without a catalog. |
+| **Baked-in Business Logic** | Gender resolution, cost fallback to 0, and SCD (Slowly Changing Dimension) filtering are invisible without a catalog. |
 | **Hidden Multi-Source Joins** | Gold views silently combine CRM and ERP data. Consumers need to trace lineage via this document. |
 | **Database Engine Limitations** | Most BI tools and SQL IDEs show column names but not semantic meaning, origin, or transformation logic. |
 
@@ -261,5 +263,4 @@ Below is the conceptual Star Schema structure connecting our dimensions to the c
 ```
 
 ---
-
 
