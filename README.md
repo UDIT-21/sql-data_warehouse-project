@@ -19,12 +19,15 @@ Built alongside the [Data With Baraa](http://bit.ly/3GiCVUE) series, featuring h
 
 ---
 
+```markdown
 ## 🏗️ Architecture & Data Flow
 
 Data progresses through three distinct layers, increasing in structure, quality, and business value.
 
 ```text
 [Raw CSVs] ➔ [ 🥉 BRONZE ] ➔ [ 🥈 SILVER ] ➔ [ 🥇 GOLD ] ➔ [ BI / Analytics ]
+
+```
 
 | Layer | Purpose | Object Type | Transformations |
 | --- | --- | --- | --- |
@@ -52,9 +55,13 @@ data-warehouse-project/
 ├── datasets/        # Raw source CRM & ERP data (.csv)
 ├── docs/            # Data dictionaries, ERDs, and naming conventions
 ├── scripts/
-   ├── bronze/      # DDL & DML for raw ingestion
-   ├── silver/      # Data cleansing & standardization procedures
-   └── gold/        # Star schema view definitions
+│   ├── bronze/      # DDL & DML for raw ingestion
+│   ├── silver/      # Data cleansing & standardization procedures
+│   └── gold/        # Star schema view definitions
+
+```
+
+```
 
 ```
 
