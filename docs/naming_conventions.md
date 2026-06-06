@@ -28,7 +28,6 @@ These conventions apply to:
   * [Natural Keys](#natural-keys)
   * [Technical Columns](#technical-columns)
 * [Stored Procedure Conventions](#stored-procedure-conventions)
-* [Examples](#examples)
 
 ---
 
