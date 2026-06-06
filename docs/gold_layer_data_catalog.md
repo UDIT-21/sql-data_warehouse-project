@@ -214,5 +214,3 @@ The Gold layer models the integrated data into a standard Star Schema optimized 
      [ Married ]                          [ Sales Calculation ]                        │
      [ Single  ]                          Sales = Quantity * price                 [ Yes ]
                                                                                    [ No  ]
-
----
