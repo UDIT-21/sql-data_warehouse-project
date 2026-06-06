@@ -1,7 +1,3 @@
-Here is the complete, updated `Data Catalog.md` file. It incorporates the Mermaid.js diagrams for both the Architecture Overview and Data Lineage/Star Schema, and I have completely removed the "Transformation Notes" column from all the data dictionary tables as requested.
-
----
-
 # Data Catalog — Gold Layer
 ### Data Warehouse | Star Schema | Business-Ready Analytics
 
@@ -11,9 +7,9 @@ Here is the complete, updated `Data Catalog.md` file. It incorporates the Mermai
 
 In any multi-layer data warehouse architecture, raw data passes through several stages of transformation before it becomes consumable. By the time data reaches the **Gold layer**, it has been:
 
-* Ingested from source systems (Bronze)
-* Cleaned, deduped, standardized, and validated (Silver)
-* Joined, enriched, and modeled into a **Star Schema** (Gold)
+- Ingested from source systems (Bronze)
+- Cleaned, deduped, standardized, and validated (Silver)
+- Joined, enriched, and modeled into a **Star Schema** (Gold)
 
 Without a catalog, the Gold layer is a black box. Analysts, BI developers, and data consumers are left guessing: *What does `customer_key` mean? Where does `gender` actually come from? Why is `prd_end_dt` sometimes NULL?* These questions cost time, introduce errors, and erode trust in data.
 
@@ -33,29 +29,34 @@ Documenting Gold specifically matters because:
 | **Surrogate keys replace natural keys** | `customer_key` and `product_key` are system-generated integers — they mean nothing without documentation. |
 | **Business logic is baked in** | Gender resolution, cost fallback to 0, SCD Type 2 filtering — these are invisible without a catalog. |
 | **Multi-source joins are hidden** | Gold views silently combine CRM and ERP data. A consumer has no way to trace lineage without this document. |
-| **Views have no column-level metadata in SQL Server** | SSMS and most BI tools show column names but not meaning or origin. |
+| **Views have no column-level metadata in SQL Server** | SSMS and most BI tools show column names but not meaning, origin, or transformation logic. |
+
+In short: **the Gold layer is where SQL ends and storytelling begins.** This catalog is that story.
 
 ---
 
 ## Architecture Overview
 
-```mermaid
-graph TD
-    %% Define Nodes
-    Source[<b>Source Systems</b> <br/> CSV Files]
-    
-    Bronze[<b>BRONZE Layer</b> <br/> Tables <br/> <i>Loaded via: bronze.load_bronze</i>]
-    
-    Silver[<b>SILVER Layer</b> <br/> Tables <br/> <i>Loaded via: silver.load_silver</i>]
-    
-    Gold[<b>GOLD Layer</b> <br/> Views <br/> <i>Queryable directly</i>]
-
-    %% Define Flows & Transformations
-    Source -->|Raw ingestion — no transformation, full fidelity| Bronze
-    Bronze -->|Cleaned, standardized, deduplicated, type-cast| Silver
-    Silver -->|Star Schema — business-ready, analytical| Gold\
-```
----
+```text
+Source Systems (CSV)
+       │
+       ▼
+┌─────────────┐
+│   BRONZE    │  Raw ingestion — no transformation, full fidelity
+│  (Tables)   │  Loaded via: bronze.load_bronze
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   SILVER    │  Cleaned, standardized, deduplicated, type-cast
+│  (Tables)   │  Loaded via: silver.load_silver
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│    GOLD     │  Star Schema — business-ready, analytical
+│   (Views)   │  Queryable directly — no load procedure needed
+└─────────────┘
 
 **Gold layer objects are SQL Views** — they do not store data. They compute on-the-fly from Silver tables every time they are queried. This ensures Gold always reflects the latest Silver state without a separate ETL run.
 
@@ -163,109 +164,61 @@ The central fact table of the Star Schema. It records every sales order line tra
 
 ---
 
-## Data Lineage
+## Data Lineage (Data Flow)
 
-The data warehouse follows a batch-processed Medallion Architecture. Data flows from external CSV files through a series of SQL stored procedures and dynamic views.
+The data warehouse follows a Medallion Architecture. The diagram below illustrates the exact flow of data from the external source files through the Bronze and Silver tables, ultimately combining into the Gold layer views.
 
-```mermaid
-graph TD
-    %% Source Layer
-    subgraph Sources [External Source Systems]
-        CRM_Files[CRM CSVs]
-        ERP_Files[ERP CSVs]
-    end
+```text
+=============================================================================================
+ SOURCES                  BRONZE LAYER               SILVER LAYER               GOLD LAYER
+=============================================================================================
 
-    %% Bronze Layer
-    subgraph Bronze [Bronze Layer: Raw Data]
-        B_CRM[bronze.crm_*]
-        B_ERP[bronze.erp_*]
-    end
+📁 CRM
+ └── sales_details ────> crm_sales_details ───────> crm_sales_details ───────> fact_sales
 
-    %% Silver Layer
-    subgraph Silver [Silver Layer: Cleansed & Conformed]
-        S_CRM[silver.crm_*]
-        S_ERP[silver.erp_*]
-    end
+📁 CRM
+ └── cust_info ────────> crm_cust_info ───────────> crm_cust_info ─────────┐
+                                                                           ├─> dim_customers
+📁 ERP                                                                     │
+ ├── erp_cust_az12 ────> erp_cust_az12 ───────────> erp_cust_az12 ─────────┤
+ └── erp_loc_a101  ────> erp_loc_a101  ───────────> erp_loc_a101  ─────────┘
 
-    %% Gold Layer
-    subgraph Gold [Gold Layer: Star Schema Views]
-        G_DimCust[gold.dim_customers]
-        G_DimProd[gold.dim_products <br/> active only]
-        G_Fact[gold.fact_sales]
-    end
+📁 CRM
+ └── prd_info  ────────> crm_prd_info  ───────────> crm_prd_info  ─────────┐
+                                                                           ├─> dim_products
+📁 ERP                                                                     │
+ └── erp_px_cat_g1v2 ──> erp_px_cat_g1v2 ─────────> erp_px_cat_g1v2 ───────┘
 
-    %% Data Flow
-    CRM_Files -->|BULK INSERT <br/> exec bronze.load_bronze| B_CRM
-    ERP_Files -->|BULK INSERT <br/> exec bronze.load_bronze| B_ERP
-
-    B_CRM -->|Standardize & Dedupe <br/> exec silver.load_silver| S_CRM
-    B_ERP -->|Standardize & Dedupe <br/> exec silver.load_silver| S_ERP
-
-    S_CRM -.->|Dynamic View Join| G_DimCust
-    S_ERP -.->|Dynamic View Join| G_DimCust
-    
-    S_CRM -.->|Dynamic View Join| G_DimProd
-    S_ERP -.->|Dynamic View Join| G_DimProd
-    
-    S_CRM -.->|Dynamic View Join| G_Fact
-    G_DimProd -.->|Surrogate Key Match| G_Fact
-    G_DimCust -.->|Surrogate Key Match| G_Fact
+=============================================================================================
 
 ```
 
 ---
 
-## Star Schema Entity-Relationship Diagram (ERD)
+## Sales Data Mart (Star Schema)
 
-**Fact Table Grain:** One row per individual sales order line item.
+The Gold layer models the integrated data into a standard Star Schema optimized for analytics. Below is the Entity-Relationship structure connecting our dimensions to the central fact table.
 
-```mermaid
-erDiagram
-    %% Dimension: Customers
-    gold_dim_customers {
-        INT customer_key PK "Surrogate Key"
-        INT customer_id "Natural Key"
-        NVARCHAR customer_number "Business Key"
-        NVARCHAR first_name 
-        NVARCHAR last_name 
-        NVARCHAR country 
-        NVARCHAR marital_status 
-        NVARCHAR gender 
-        DATE birthdate 
-        DATE create_date 
-    }
-
-    %% Dimension: Products
-    gold_dim_products {
-        INT product_key PK "Surrogate Key (SCD2 Active)"
-        INT product_id "Natural Key"
-        NVARCHAR product_number "Business Key"
-        NVARCHAR product_name 
-        NVARCHAR category_id 
-        NVARCHAR category 
-        NVARCHAR subcategory 
-        NVARCHAR maintenance 
-        INT cost 
-        NVARCHAR product_line 
-        DATE start_date 
-    }
-
-    %% Fact: Sales
-    gold_fact_sales {
-        NVARCHAR order_number "Degenerate Dimension"
-        INT product_key FK 
-        INT customer_key FK 
-        DATE order_date 
-        DATE shipping_date 
-        DATE due_date 
-        INT sales_amount 
-        INT quantity 
-        INT price 
-    }
-
-    %% Relationships
-    gold_dim_customers ||--o{ gold_fact_sales : "places"
-    gold_dim_products ||--o{ gold_fact_sales : "contains"
+```text
+┌──────────────────────┐              ┌──────────────────────┐              ┌──────────────────────┐
+│  gold.dim_customers  │              │   gold.fact_sales    │              │  gold.dim_products   │
+├──────────────────────┤              ├──────────────────────┤              ├──────────────────────┤
+│ PK customer_key      │ 1          * │ order_number         │ * 1 │ PK product_key       │
+├──────────────────────┤──────────────┤ FK1 product_key      ├──────────────├──────────────────────┤
+│    customer_id       │              │ FK2 customer_key     │              │    product_id        │
+│    customer_number   │              │ order_date           │              │    product_number    │
+│    first_name        │              │ shipping_date        │              │    product_name      │
+│    last_name         │              │ due_date             │              │    category_id       │
+│    country           │              │ sales_amount         │              │    category          │
+│    marital_status    │              │ quantity             │              │    subcategory       │
+│    gender            │              │ price                │              │    maintenance       │
+│    birthdate         │              └───────────┬──────────┘              │    cost              │
+│    country           │                          │                         │    product_line      │
+└─────────┬────────────┘                          │                         │    start_date        │
+          │                                       │                         └──────────┬───────────┘
+     [ Married ]                          [ Sales Calculation ]                        │
+     [ Single  ]                          Sales = Quantity * price                 [ Yes ]
+                                                                                   [ No  ]
 
 ```
 
