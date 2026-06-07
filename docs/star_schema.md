@@ -1,10 +1,9 @@
-# Data Model — Star Schema
-**Schema:** gold
+# Data Model — Star Schema (Gold Layer)
 ---
 
 ## Schema Overview
 
-The Sales Data Mart is structured as a **star schema** — a single central fact table recording every sales transaction, surrounded by two conformed dimension tables that provide descriptive context for customers and products.
+The Data Model is structured as a **star schema** — a single central fact table recording every sales transaction, surrounded by two conformed dimension tables that provide descriptive context for customers and products.
 
 The fact table sits at the centre of the model; every analytical query joins outward to one or both dimensions to add meaning to the raw measures.
 
