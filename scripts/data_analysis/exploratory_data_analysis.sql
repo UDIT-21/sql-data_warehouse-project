@@ -19,11 +19,14 @@ Why EDA Before Reporting?
     or a category that maps to nothing. EDA surfaces these before they
     propagate into executive dashboards.
 
-    EDA also answers the pre-report questions the business always asks:
-        - "How far back does the data go?"
-        - "How many customers do we actually have?"
-        - "Which products move the most volume?"
-    Knowing the answers in advance makes report reviews much smoother.
+KPI: Key Performance Indicators
+    A metric is just any number you can measure — page views, number of products, average age of customers. 
+    A KPI is a metric that's been chosen because it directly reflects whether a business goal is being met. 
+    Every KPI is a metric, but not every metric is a KPI.
+        1. A KPI only exists in relation to a goal.
+        2. Take any metric and ask "so what?" until you hit a business decision.
+        3. A KPI without an owner is just a number. If nobody is accountable for moving it, it won't be acted on.
+        4. Check if it influences decisions.
 
 -------------------------------------------------------------------------------
 Dimensions vs. Measures — The Analyst's Compass
