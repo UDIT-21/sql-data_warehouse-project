@@ -1,47 +1,19 @@
-Here is the data flow and data lineage represented in Markdown.
+---
+# Introduction to Data Lineage
 
-### 1. Hierarchical Text Representation
-
-**Sources**
-
-* **CRM**
-* ➔ `crm_sales_details` (Bronze)
-* ➔ `crm_cust_info` (Bronze)
-* ➔ `crm_prd_info` (Bronze)
-
-
-* **ERP**
-* ➔ `erp_cust_az12` (Bronze)
-* ➔ `erp_loc_a101` (Bronze)
-* ➔ `erp_px_cat_g1v2` (Bronze)
-
-
-
+> **Data lineage** is the comprehensive map of your data’s journey. It tracks the complete lifecycle of data: its origin, every transformation it undergoes, and its final destination.
 ---
 
-**Medallion Architecture Lineage**
+## Why is Data Lineage Critical?
 
-* **Fact: Sales** (`fact_sales` - Gold)
-* *Sourced from:* `crm_sales_details` (Silver) ➔ `crm_sales_details` (Bronze) ➔ CRM
+As data ecosystems grow from a few tables to thousands of interdependent models, tracking dependencies manually becomes impossible. Implementing clear data lineage serves four primary functions:
 
-
-* **Dimension: Customers** (`dim_customers` - Gold)
-* *Sourced from:* `crm_cust_info` (Silver) ➔ `crm_cust_info` (Bronze) ➔ CRM
-* *Sourced from:* `erp_cust_az12` (Silver) ➔ `erp_cust_az12` (Bronze) ➔ ERP
-* *Sourced from:* `erp_loc_a101` (Silver) ➔ `erp_loc_a101` (Bronze) ➔ ERP
-
-
-* **Dimension: Products** (`dim_products` - Gold)
-* *Sourced from:* `crm_prd_info` (Silver) ➔ `crm_prd_info` (Bronze) ➔ CRM
-* *Sourced from:* `erp_px_cat_g1v2` (Silver) ➔ `erp_px_cat_g1v2` (Bronze) ➔ ERP
-
-
+* **Root Cause Analysis (Debugging):** When a metric drops or a dashboard breaks, lineage prevents blind guessing. Engineers can trace a broken Gold-layer metric upstream through the Silver layer to find the exact source ingestion that failed.
+* **Impact Analysis (Preventing Disasters):** Before altering or dropping a source column (e.g., changing `cust_id` to `customer_identifier`), lineage allows teams to look downstream. This reveals exactly which models and dashboards will be affected, enabling proactive updates before systems crash.
+* **Trust and Data Quality:** Stakeholders rarely trust a number they don't understand. Lineage provides transparency, proving exactly which source systems, filters, and business logic fed into a final dashboard metric.
+* **Regulatory Compliance and Auditing:** Under data privacy laws (like GDPR or HIPAA), organizations must track Personally Identifiable Information (PII). Lineage allows compliance teams to find exactly where a user's data has propagated throughout the warehouse so it can be properly audited or deleted.
 
 ---
-
-### 2. Mermaid.js Flowchart
-
-You can paste this code block into any Markdown viewer that supports Mermaid (like GitHub, Notion, or Obsidian) to automatically generate the visual diagram.
 
 ```mermaid
 graph LR
