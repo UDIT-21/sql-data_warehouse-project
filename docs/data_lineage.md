@@ -1,4 +1,3 @@
----
 # Introduction to Data Lineage
 
 > **Data lineage** is the comprehensive map of your data’s journey. It tracks the complete lifecycle of data: its origin, every transformation it undergoes, and its final destination.
