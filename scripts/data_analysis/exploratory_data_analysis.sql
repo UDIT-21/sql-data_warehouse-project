@@ -3,328 +3,574 @@
 Exploratory Data Analysis (EDA): Gold Layer
 ===============================================================================
 
-What is EDA?
-    Exploratory Data Analysis (EDA) is the first and most critical step after
-    building a data warehouse. It is the process of systematically examining
-    your dataset to understand its structure, content, distributions, and
-    quality before building any reports, dashboards, or advanced analytics
-    on top of it.
+Purpose:
+    This script performs a systematic, six-phase exploration of the Gold Layer
+    in the DataWarehouse. It is designed to run immediately after the Gold Layer
+    views are verified, and before any BI reports, dashboards, or advanced
+    analytics are built on top of them.
 
-    EDA answers the fundamental question:
-    "What does this data actually look like, and what story does it tell?"
+    Think of this as the analyst's "first conversation" with the data — the
+    goal is to understand what is actually in the warehouse, not just what the
+    schema says should be there.
 
-Why do we perform EDA?
-    - To verify the ETL pipeline produced correct, complete, and consistent
-      data all the way from raw CSVs through Bronze and Silver to Gold.
-    - To discover the real shape of the data: ranges, cardinalities, outliers,
-      and patterns that were not visible at the schema design stage.
-    - To understand the business story before writing reports — which countries
-      have the most customers, which product categories drive the most revenue,
-      what time span the sales data covers.
-    - To build the foundation for Advanced Analytics, which includes trends,
-      cumulative analysis, performance analysis, segmentation, and reporting.
+Why EDA Before Reporting?
+    Every pipeline can introduce silent errors: wrong grain joins that
+    double-count revenue, date columns loaded as strings, NULL customer keys,
+    or a category that maps to nothing. EDA surfaces these before they
+    propagate into executive dashboards.
 
--------------------------------------------------------------------------------
-Understanding Dimensions vs. Measures
--------------------------------------------------------------------------------
-    Before exploring any dataset, every column must be classified into one of
-    two buckets. The key question to ask for each column is:
-
-        "Is it numeric AND does aggregating it make business sense?"
-
-    MEASURES (Numeric + Aggregatable)
-        Columns whose aggregation (SUM, AVG, MIN, MAX) produces a meaningful
-        business number. These are the VALUES we analyse.
-        Examples in this dataset:
-            - sls_sales    → total revenue
-            - sls_quantity → units sold
-            - sls_price    → unit price
-            - Age          → average customer age
-
-    DIMENSIONS (Categorical OR numeric but NOT meaningfully aggregatable)
-        Columns used to GROUP, FILTER, or SLICE measures. These are the LENSES
-        through which we look at the data.
-        Examples in this dataset:
-            - country, gender, marital_status → group customers by
-            - category, subcategory, product_line → group products by
-            - order_date, birthdate → date-based slicing
-            - customer_id, product_id → identifiers (numeric but summing
-              them has no business meaning)
+    EDA also answers the pre-report questions the business always asks:
+        - "How far back does the data go?"
+        - "How many customers do we actually have?"
+        - "Which products move the most volume?"
+    Knowing the answers in advance makes report reviews much smoother.
 
 -------------------------------------------------------------------------------
-EDA Phases (in order)
+Dimensions vs. Measures — The Analyst's Compass
 -------------------------------------------------------------------------------
-    This script follows six phases of Exploratory Data Analysis:
+
+    Before writing a single GROUP BY, classify every column by asking:
+
+        "Is it numeric AND does aggregating it produce a meaningful business
+         number?"
+
+    MEASURES  → Numeric + Aggregatable = the VALUES we analyse
+        sls_sales_amount  → total revenue
+        sls_quantity      → units sold
+        sls_price         → unit selling price
+        customer age      → average demographic indicator
+
+    DIMENSIONS → Categorical OR non-aggregatable numeric = the LENSES we
+                 use to slice measures
+        country, gender, marital_status → customer segmentation lenses
+        category, subcategory, product_line → product taxonomy lenses
+        order_date, birthdate → time-based slicing axes
+        customer_key, product_key → surrogate identifiers; numerically
+            meaningless to SUM, used only for COUNT DISTINCT cardinality
+
+-------------------------------------------------------------------------------
+EDA Phases
+-------------------------------------------------------------------------------
 
     Phase 1 — Database Exploration
-        Understand the high-level inventory: what tables/views exist, how many
-        columns each has, and what data types are present.
+        Asset inventory: what objects exist, their schemas, and their columns.
 
     Phase 2 — Dimensions Exploration
-        Explore the categorical columns. Find distinct values, cardinalities,
-        and distributions across dimensions like country, category, gender.
+        Categorical profiling: distinct values, cardinalities, and any
+        unexpected entries (typos, NULLs, legacy codes).
 
     Phase 3 — Date Exploration
-        Understand the time span of the data. Find the earliest and latest
-        order dates, customer birthdates, and identify any date gaps.
+        Temporal coverage: earliest/latest dates, age ranges, data freshness.
 
-    Phase 4 — Measures Exploration (Big Numbers)
-        Compute the high-level aggregates: total revenue, total quantity sold,
-        average price, min/max values — the "big numbers" of the dataset.
+    Phase 4 — Measures Exploration
+        High-level aggregates: the "big numbers" — total revenue, units,
+        average price, order counts.
 
     Phase 5 — Magnitude Analysis
-        Compare the size of measures across dimensions. For example, total
-        sales by country or total quantity by product category.
+        Cross-dimensional aggregation: measures broken down by each dimension
+        to reveal where the business is concentrated.
 
-    Phase 6 — Ranking Analysis (Top N / Bottom N)
-        Identify the best and worst performers across dimensions. For example,
-        top 5 products by revenue or bottom 3 countries by order volume.
+    Phase 6 — Ranking Analysis
+        Top-N / Bottom-N: best and worst performers to guide prioritisation.
 
-Usage:
-    Run this script against the DataWarehouse database after gold views have
-    been created and verified via scripts/gold/verify_gold_layer.sql.
+Prerequisite:
+    Run scripts/gold/verify_gold_layer.sql and confirm zero failures before
+    executing this script.
+
+Target Database: DataWarehouse
+Target Schema:   gold
 ===============================================================================
 */
+
 USE DataWarehouse;
 GO
 
---1. Explore all Objects in the Database. INFORMATION_SCHEMA is the standard, cross-database method for querying metadata about your database structure.
-SELECT * FROM INFORMATION_SCHEMA.TABLES;
 
---2. Explore all Columns in the Database.
-SELECT * FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA IN ('gold'); -- Focus on gold layer
+/* ============================================================================
+   PHASE 1 — DATABASE EXPLORATION
+   "What does our data warehouse actually expose to downstream consumers?"
+   ============================================================================
+   Before touching any data, map the full inventory of objects in the warehouse.
+   This confirms that all expected tables and views were created successfully
+   and gives every analyst an accurate mental model of what is available.
+   Skipping this step risks querying stale or wrong objects silently.
+   ============================================================================ */
 
--- 3.1 Dimensions Exploration: Explore categorical columns in dim_customers.
-SELECT DISTINCT country FROM gold.dim_customers;
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1.1  What schemas and tables/views are registered in the warehouse?
+--
+--      Implication: A complete object inventory. If any Gold view is missing
+--      from this list, the upstream stored procedure failed silently and all
+--      downstream queries will return errors or stale data.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT * 
+FROM INFORMATION_SCHEMA.TABLES;
 
--- 3.2 Dimensions Exploration: Explore categorical columns in dim_products.
-SELECT DISTINCT category,subcategory,product_name FROM gold.dim_products;
 
--- 4.1 Date Exploration: Find the date of the earliest and latest order in fact_sales, How many years of sales data do we have?
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1.2  What columns are available in the Gold Layer, and what are their types?
+--
+--      Implication: Column-level inventory for the gold schema. Catches schema
+--      drift early — a column renamed during a Silver rebuild will appear
+--      missing here before any report notices it. Also useful when onboarding
+--      new analysts who need to understand the full data model quickly.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT * 
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_SCHEMA = 'gold';
+
+
+/* ============================================================================
+   PHASE 2 — DIMENSIONS EXPLORATION
+   "What are the distinct categorical values in each dimension, and are there
+    any unexpected entries — misspellings, NULLs, or legacy codes — that
+    would corrupt downstream groupings?"
+   ============================================================================ */
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2.1  What geographic markets does the business currently operate in?
+--
+--      Implication: Validates the customer dimension's country column.
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT DISTINCT country 
+FROM gold.dim_customers
+ORDER BY country;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 2.2  What does our complete product taxonomy look like — from category
+--      down to individual product name?
+--
+--      Implication: Validates the three-level hierarchy (Category →
+--      Sub-category → Product Name) in dim_products. 
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT DISTINCT 
+    category, 
+    subcategory, 
+    product_name 
+FROM gold.dim_products
+ORDER BY category, subcategory, product_name;
+
+
+/* ============================================================================
+   PHASE 3 — DATE EXPLORATION
+   "What is the temporal coverage of our data, and do we have enough history
+    to support trend analysis, year-over-year comparisons, and cohort studies?"
+   ============================================================================ */
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3.1  How many years of transactional history do we hold, and when exactly
+--      does it begin and end?
+--
+--      Implication: Determines the maximum lookback window for trend reports.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-MIN(order_date) AS first_order_date,
-MAX(order_date) AS last_order_date ,
-DATEDIFF(year, MIN(order_date), MAX(order_date)) AS years_of_sales_data
+    MIN(order_date)                                    AS first_order_date,
+    MAX(order_date)                                    AS last_order_date,
+    DATEDIFF(YEAR, MIN(order_date), MAX(order_date))   AS years_of_sales_data
 FROM gold.fact_sales;
 
---4.2 Date Exploration: Find the youngest and oldest customers based on birthdate in dim_customers. What is the age range of customers?
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3.2  What is the age range of our customer base at a population level?
+--
+--      Implication: Surfaces the overall demographic spread.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-MIN(birthdate) AS oldest_birthdate,
-DATEDIFF(YEAR, MIN(birthdate), GETDATE()) AS oldest_age,
-MAX(birthdate) AS youngest_birthdate,
-DATEDIFF(YEAR, MAX(birthdate), GETDATE()) AS youngest_age,
-AVG(DATEDIFF(YEAR, birthdate, GETDATE())) AS  avg_age_of_customer  -- DATEDIFF calculates age for each customer, and AVG gives the average age of customers
+    MIN(birthdate)                                      AS oldest_birthdate,
+    DATEDIFF(YEAR, MIN(birthdate), GETDATE())           AS oldest_age,
+    MAX(birthdate)                                      AS youngest_birthdate,
+    DATEDIFF(YEAR, MAX(birthdate), GETDATE())           AS youngest_age,
+    AVG(DATEDIFF(YEAR, birthdate, GETDATE()))           AS avg_age_of_customer
+    -- DATEDIFF calculates each customer's current age; AVG then gives
+    -- the mean age across the entire registered customer population.
 FROM gold.dim_customers;
 
--- 4.3 Date Exploration: Find the youngest and oldest customers based on birthdate in dim_customers. What is the age range of customers? Also, return their names.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3.3  Who are the single oldest and youngest customers by name, and what
+--      is the average age of the full customer base? Using Window Function.
+--
+--      Implication: Personalises the age-range story for stakeholder
+--      presentations.
+-- ─────────────────────────────────────────────────────────────────────────────
 WITH AgeCalculations AS (
     SELECT 
-        CONCAT(first_name, ' ', last_name) AS customer_name,
+        CONCAT(first_name, ' ', last_name)         AS customer_name,
         birthdate,
-        DATEDIFF(YEAR, birthdate, GETDATE()) AS age,
-        ROW_NUMBER() OVER (ORDER BY birthdate ASC) AS oldest_rank,
+        DATEDIFF(YEAR, birthdate, GETDATE())        AS age,
+        ROW_NUMBER() OVER (ORDER BY birthdate ASC)  AS oldest_rank,
         ROW_NUMBER() OVER (ORDER BY birthdate DESC) AS youngest_rank
     FROM gold.dim_customers
     WHERE birthdate IS NOT NULL
 )
 SELECT 
-    MAX(CASE WHEN oldest_rank = 1 THEN customer_name END) AS oldest_customer_name,
-    MIN(birthdate) AS oldest_birthdate,
-    MAX(CASE WHEN oldest_rank = 1 THEN age END) AS oldest_age,
+    MAX(CASE WHEN oldest_rank  = 1 THEN customer_name END) AS oldest_customer_name,
+    MIN(birthdate)                                          AS oldest_birthdate,
+    MAX(CASE WHEN oldest_rank  = 1 THEN age END)           AS oldest_age,
     MAX(CASE WHEN youngest_rank = 1 THEN customer_name END) AS youngest_customer_name,
-    MAX(CASE WHEN youngest_rank = 1 THEN birthdate END) AS youngest_birthdate,
-    MAX(CASE WHEN youngest_rank = 1 THEN age END) AS youngest_age,
-    AVG(age) AS avg_age_of_customer
+    MAX(CASE WHEN youngest_rank = 1 THEN birthdate END)    AS youngest_birthdate,
+    MAX(CASE WHEN youngest_rank = 1 THEN age END)          AS youngest_age,
+    AVG(age)                                               AS avg_age_of_customer
 FROM AgeCalculations;
 
--- 5.1 Measures Exploration: Calculate the key metric of the business. Find the Total Sales & how many items are sold
+
+/* ============================================================================
+   PHASE 4 — MEASURES EXPLORATION  (The "Big Numbers")
+   "At the highest level of aggregation, what does the business look like?
+    What are the headline figures that would appear on an executive summary?"
+   ============================================================================ */
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4.1  What is the total gross revenue, and how many units has the business
+--      sold in aggregate across all time?
+--
+--      Implication: The two most fundamental business metrics. Total revenue
+--      is the north-star KPI for most organisations; total quantity confirms
+--      whether revenue is being driven by volume or by price.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-SUM(quantity) AS total_quantity,
-SUM(sales_amount) AS total_sales
+    SUM(quantity)     AS total_quantity,
+    SUM(sales_amount) AS total_sales
 FROM gold.fact_sales;
 
--- 5.2 Measures Exploration: Find the Average Selling Price
-SELECT AVG(price) AS avg_price FROM gold.fact_sales;
 
--- 5.3 Measures Exploration: Find the Total number of Oders
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4.2  What is the average unit selling price across all transactions?
+--
+--      Implication: Establishes the baseline average selling price (ASP).
+--      When compared with dim_products.cost, this forms the basis for gross
+--      margin analysis.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-COUNT((order_number)) AS total_entries,
-COUNT(DISTINCT(order_number)) AS total_distinct_oders 
+    AVG(price) AS avg_price 
 FROM gold.fact_sales;
 
--- 5.4 Measures Exploration: Find the Total number of registered Products
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4.3  How many discrete sales transactions (orders) has the business
+--      processed, and how does raw row count compare with distinct order count?
+--
+--      Implication: The gap between total_entries and total_distinct_orders
+--      reveals the average number of line items per order.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-COUNT(DISTINCT(product_key)) AS total_products
+    COUNT(order_number)          AS total_entries,
+    COUNT(DISTINCT order_number) AS total_distinct_orders
+FROM gold.fact_sales;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4.4  How wide is our product catalogue — how many unique products are
+--      we able to sell?
+--
+--      Implication: Baseline catalogue size. 
+-- ─────────────────────────────────────────────────────────────────────────────
+SELECT 
+    COUNT(DISTINCT product_key) AS total_products
 FROM gold.dim_products;
 
--- 5.5 Measures Exploration: Find the Total number of registered Customer
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4.5  How large is our total registered customer base?
+--
+--      Implication: The size of the CRM universe. This is the denominator for
+--      any customer activation or retention rate calculation.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-COUNT(DISTINCT(customer_key)) AS total_customers
+    COUNT(DISTINCT customer_key) AS total_registered_customers
 FROM gold.dim_customers;
 
--- 5.6 Measures Exploration: Find the Total number of Customer who have made a purchase
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4.6  Of all registered customers, how many have actually placed an order?
+--      What is our customer activation rate?
+--
+--      Implication: Comparing this number with total_registered_customers
+--      (above) gives the activation rate = active buyers / registered base.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-COUNT(DISTINCT(customer_key)) AS total_customers
+    COUNT(DISTINCT customer_key) AS total_active_customers
 FROM gold.fact_sales;
 
--- 5.7 Basket Analysis: Find the average items a customer purchase and revenue per unique order
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4.7  What does a typical order look like in terms of item count and
+--      monetary value? (Basket Analysis)
+--
+--      Implication: Average items per order is the basket depth metric used
+--      in upsell and cross-sell strategy. Average order value (AOV) is the
+--      primary lever for revenue growth without acquiring new customers.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT
-SUM(quantity) / COUNT(DISTINCT order_number) AS avg_items_per_order,
-SUM(sales_amount) / COUNT(DISTINCT order_number) AS avg_order_value
+    SUM(quantity)     / COUNT(DISTINCT order_number) AS avg_items_per_order,
+    SUM(sales_amount) / COUNT(DISTINCT order_number) AS avg_order_value
 FROM gold.fact_sales;
 
---6. Generate a Report of all key metrices
 
-SELECT 'Total Revenue' AS Metric, CAST(SUM(sales_amount) AS VARCHAR(20)) AS Value FROM gold.fact_sales
-UNION ALL
-SELECT 'Total Units Sold', CAST(SUM(quantity) AS VARCHAR(20)) FROM gold.fact_sales
-UNION ALL
-SELECT 'Average Unit Price', CAST(CAST(AVG(price) AS DECIMAL(10, 2)) AS VARCHAR(20)) FROM gold.fact_sales
-UNION ALL
-SELECT 'Min Price', CAST(MIN(price) AS VARCHAR(20)) FROM gold.fact_sales
-UNION ALL
-SELECT 'Max Price', CAST(MAX(price) AS VARCHAR(20)) FROM gold.fact_sales
-UNION ALL
-SELECT 'Total Orders', CAST(COUNT(DISTINCT order_number) AS VARCHAR(20)) FROM gold.fact_sales
-UNION ALL
-SELECT 'Total Products', CAST(COUNT(DISTINCT product_key) AS VARCHAR(20)) FROM gold.dim_products
-UNION ALL
-SELECT 'Total Customers', CAST(COUNT(DISTINCT customer_key) AS VARCHAR(20)) FROM gold.dim_customers
-UNION ALL
-SELECT 'Customers Who Bought', CAST(COUNT(DISTINCT customer_key) AS VARCHAR(20)) FROM gold.fact_sales;
+/* ============================================================================
+   PHASE 5 — KEY METRICS SUMMARY REPORT
+   "Can we produce a single-screen executive summary of every headline KPI
+    in the warehouse, formatted so it can be dropped directly into a briefing?"
+   ============================================================================ */
 
--- 7. Magnitude Analysis: Aggregate measures by dimensions. Find total customer by country.
+SELECT 'Total Revenue'          AS metric, CAST(SUM(sales_amount) AS VARCHAR(20))                         AS value FROM gold.fact_sales
+UNION ALL
+SELECT 'Total Units Sold',               CAST(SUM(quantity) AS VARCHAR(20))                               FROM gold.fact_sales
+UNION ALL
+SELECT 'Average Unit Price',             CAST(CAST(AVG(price) AS DECIMAL(10, 2)) AS VARCHAR(20))          FROM gold.fact_sales
+UNION ALL
+SELECT 'Min Unit Price',                 CAST(MIN(price) AS VARCHAR(20))                                  FROM gold.fact_sales
+UNION ALL
+SELECT 'Max Unit Price',                 CAST(MAX(price) AS VARCHAR(20))                                  FROM gold.fact_sales
+UNION ALL
+SELECT 'Total Distinct Orders',          CAST(COUNT(DISTINCT order_number) AS VARCHAR(20))                FROM gold.fact_sales
+UNION ALL
+SELECT 'Total Products in Catalogue',    CAST(COUNT(DISTINCT product_key)  AS VARCHAR(20))                FROM gold.dim_products
+UNION ALL
+SELECT 'Total Registered Customers',     CAST(COUNT(DISTINCT customer_key) AS VARCHAR(20))                FROM gold.dim_customers
+UNION ALL
+SELECT 'Customers Who Placed an Order',  CAST(COUNT(DISTINCT customer_key) AS VARCHAR(20))                FROM gold.fact_sales;
+
+
+/* ============================================================================
+   PHASE 6 — MAGNITUDE ANALYSIS
+   "Where is the business concentrated? Which dimensions account for the
+    majority of customers, products, and revenue — and which are marginal?"
+   ============================================================================ */
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6.1  How is our customer base distributed across geographic markets?
+--
+--      Implication: Identifies which countries are the primary customer
+--      acquisition markets vs. which are negligible.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT 
-country, 
-COUNT(DISTINCT customer_key) AS total_customers
+    country, 
+    COUNT(DISTINCT customer_key) AS total_customers
 FROM gold.dim_customers
 GROUP BY country
 ORDER BY total_customers DESC;
 
--- 7.2 Magnitude Analysis: Find total customer by gender.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6.2  What is the gender split of our registered customer base?
+--
+--      Implication: Informs marketing and creative strategy.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT  
-gender,
-COUNT(DISTINCT customer_key) AS total_customers
+    gender,
+    COUNT(DISTINCT customer_key) AS total_customers
 FROM gold.dim_customers
 GROUP BY gender 
 ORDER BY total_customers DESC;
 
--- 7.3 Magnitude Analysis: Find total products by cateogy
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6.3  How many distinct products does each category contain?
+--
+--      Implication: Reveals catalogue concentration.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT  
-category,
-COUNT(DISTINCT product_key) AS total_products
+    category,
+    COUNT(DISTINCT product_key) AS total_products
 FROM gold.dim_products
 GROUP BY category
 ORDER BY total_products DESC;
 
--- 7.4 Magnitude Analysis: Find average cost by each category.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6.4  What is the average product cost per category?
+--
+--      Implication: Establishes the cost baseline by category, which feeds
+--      directly into gross margin calculations when paired with average
+--      selling price by category.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT  
-category,
-AVG(cost) AS avg_cost
+    category,
+    AVG(cost) AS avg_cost
 FROM gold.dim_products
 GROUP BY category
 ORDER BY avg_cost DESC;
 
--- 7.5 Magnitude Analysis: Find total revenue by each category.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6.5  Which product categories are driving the most revenue for the business?
+--
+--      Implication: The single most important category-level question for
+--      merchandising and supply chain teams. Confirms which categories to
+--      prioritise in inventory planning and promotional spend.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT  
-p.category,
-SUM(f.sales_amount) AS total_revenue
+    p.category,
+    SUM(f.sales_amount) AS total_revenue
 FROM gold.fact_sales f
 LEFT JOIN gold.dim_products p 
-ON f.product_key = p.product_key
+    ON f.product_key = p.product_key
 GROUP BY p.category
 ORDER BY total_revenue DESC;
 
--- 7.6 Magnitude Analysis: Find total revenue by each customer.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6.6  What is the total lifetime revenue attributed to each individual
+--      customer?
+--
+--      Implication: This is the Customer Lifetime Value (CLV) proxy —
+--      arguably the most important customer-level metric for CRM strategy.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT  
-c.customer_key,
-CONCAT(c.first_name,' ', c.last_name) AS customer_name,
-SUM(f.sales_amount) AS total_revenue
+    c.customer_key,
+    CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+    SUM(f.sales_amount)                    AS total_revenue
 FROM gold.fact_sales f
 LEFT JOIN gold.dim_customers c
-ON f.customer_key = c.customer_key
+    ON f.customer_key = c.customer_key
 GROUP BY c.customer_key, c.first_name, c.last_name
 ORDER BY total_revenue DESC;
 
--- 7.7 Magnitude Analysis: Find the distribution of sold items across different countries.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6.7  How is total product volume (units sold) distributed across
+--      geographic markets?
+--
+--      Implication: Volume distribution by country reveals which markets
+--      absorb the most physical product — critical for logistics, warehouse
+--      positioning, and fulfilment SLA planning.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT  
-c.country,
-SUM(f.quantity) AS sold_items
+    c.country,
+    SUM(f.quantity) AS total_units_sold
 FROM gold.fact_sales f
 LEFT JOIN gold.dim_customers c
-ON f.customer_key = c.customer_key
+    ON f.customer_key = c.customer_key
 GROUP BY c.country
-ORDER BY country ASC;
+ORDER BY total_units_sold DESC;
 
--- 8.1 Ranking Analysis: Rank Dimensions by aggregated Measures. Find top 5 products by revenue.
+
+/* ============================================================================
+   PHASE 7 — RANKING ANALYSIS  (Top N / Bottom N)
+   "Who and what are the outliers — the clear over-performers we should
+    double down on, and the clear under-performers we should investigate
+    or deprioritise?"
+   ============================================================================ */
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7.1a  Which five individual products generate the most revenue?
+--      (Approach A: TOP with ORDER BY)
+--
+--      Implication: The top-5 revenue products are typically responsible for
+--      a disproportionate share of total revenue (Pareto principle). These are
+--      the products that demand the highest stock availability, the most
+--      prominent placement in digital and physical channels, and the first
+--      consideration in any promotional strategy.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT TOP 5
-p.product_name, p.category, p.subcategory,
-SUM(f.sales_amount) AS total_revenue
+    p.product_name,
+    p.category,
+    p.subcategory,
+    SUM(f.sales_amount) AS total_revenue
 FROM gold.fact_sales f
 LEFT JOIN gold.dim_products p 
-ON f.product_key = p.product_key
+    ON f.product_key = p.product_key
 GROUP BY p.product_name, p.category, p.subcategory
 ORDER BY total_revenue DESC;
 
--- By Window Function (Top 5 products by revenue)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7.1b Which five individual products generate the most revenue? Using Window Function. 
+--
+--      Implication: Identical business question as 7.1 but implemented with
+--      ROW_NUMBER() so the rank value is available as a column. 
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT *
 FROM (
     SELECT
-    p.product_name,
-    SUM(f.sales_amount) AS total_revenue,
-    ROW_NUMBER() OVER (ORDER BY SUM(f.sales_amount) DESC) AS rank_products
+        p.product_name,
+        SUM(f.sales_amount)                                    AS total_revenue,
+        ROW_NUMBER() OVER (ORDER BY SUM(f.sales_amount) DESC) AS revenue_rank
     FROM gold.fact_sales f
     LEFT JOIN gold.dim_products p 
-    ON f.product_key = p.product_key
+        ON f.product_key = p.product_key
     GROUP BY p.product_name
-    )t
-WHERE rank_products <= 5;
+) ranked_products
+WHERE revenue_rank <= 5;
 
--- 8.2 Ranking Analysis: Rank Dimensions by aggregated Measures. Find top 5 products by revenue.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7.2  Which five product sub-categories are the strongest revenue contributors?
+--
+--      Implication: One level above individual products, sub-category ranking
+--      reveals which product families — not just individual SKUs — are winning
+--      commercially. 
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT TOP 5
-p.subcategory,
-SUM(f.sales_amount) AS total_revenue
+    p.subcategory,
+    SUM(f.sales_amount) AS total_revenue
 FROM gold.fact_sales f
 LEFT JOIN gold.dim_products p 
-ON f.product_key = p.product_key
+    ON f.product_key = p.product_key
 GROUP BY p.subcategory
 ORDER BY total_revenue DESC;
 
--- 8.3 Ranking Analysis: Find top 10 customers by revenue.
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7.3  Who are our top 10 highest-spending customers by lifetime revenue?
+--
+--      Implication: These are the VIP accounts. Losing even one of these
+--      customers has a measurable P&L impact. This list feeds directly into
+--      account management prioritisation, dedicated customer success outreach,
+--      and early access to new product launches.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT TOP 10
-c.customer_key,
-CONCAT(c.first_name,' ', c.last_name) AS customer_name,
-SUM(f.sales_amount) AS total_revenue
+    c.customer_key,
+    CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+    SUM(f.sales_amount)                    AS total_revenue
 FROM gold.fact_sales f
 LEFT JOIN gold.dim_customers c
-ON f.customer_key = c.customer_key
+    ON f.customer_key = c.customer_key
 GROUP BY c.customer_key, c.first_name, c.last_name
 ORDER BY total_revenue DESC;
 
--- By Window Function (Last 3 customers by order placed)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7.4  Which three customers have placed the fewest orders — our most
+--      infrequent buyers?
+--      (Window Function approach)
+--
+--      Implication: Customers who have transacted only once or twice are the
+--      highest-risk segment for permanent churn. This list is the seed for a
+--      win-back campaign.
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT *
 FROM (
     SELECT
-    c.customer_key,
-    CONCAT(c.first_name,' ', c.last_name) AS customer_name,
-    COUNT(DISTINCT f.order_number) AS total_oders,
-    ROW_NUMBER() OVER (ORDER BY COUNT(DISTINCT f.order_number) ASC) AS rank_customers
+        c.customer_key,
+        CONCAT(c.first_name, ' ', c.last_name)                      AS customer_name,
+        COUNT(DISTINCT f.order_number)                               AS total_orders,
+        ROW_NUMBER() OVER (ORDER BY COUNT(DISTINCT f.order_number) ASC) AS order_frequency_rank
     FROM gold.fact_sales f
     LEFT JOIN gold.dim_customers c
-    ON f.customer_key = c.customer_key
+        ON f.customer_key = c.customer_key
     GROUP BY c.customer_key, c.first_name, c.last_name 
-    )t
-WHERE rank_customers <= 3;
- 
+) ranked_customers
+WHERE order_frequency_rank <= 3;
 
 
--- 8.4 Ranking Analysis: Find 5 worst performing products by sales revenue.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7.5  Which five products are the weakest performers by total revenue?
+--
+--      Implication: The bottom-5 revenue products are candidates for range
+--      rationalisation. Before acting on this, compare with quantity sold
+--      (a low-revenue product may have high volume and serve as a loss-leader)
+--      and with days-in-range (a new product naturally has less accumulated
+--      revenue).
+-- ─────────────────────────────────────────────────────────────────────────────
 SELECT TOP 5
-p.product_name, p.subcategory,
-SUM(f.sales_amount) AS total_revenue
+    p.product_name,
+    p.subcategory,
+    SUM(f.sales_amount) AS total_revenue
 FROM gold.fact_sales f
 LEFT JOIN gold.dim_products p 
-ON f.product_key = p.product_key
+    ON f.product_key = p.product_key
 GROUP BY p.product_name, p.subcategory
 ORDER BY total_revenue ASC;
