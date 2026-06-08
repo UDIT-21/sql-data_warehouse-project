@@ -304,7 +304,6 @@ FROM 'C:\Users\YourName\data-warehouse-project\datasets\source_crm\cust_info.csv
 ## 🙏 Acknowledgements
 
 - **Curriculum:** Inspired by and developed alongside the [Data With Baraa](https://www.youtube.com/@DataWithBaraa) Data Engineering Series.
-- 
 ---
 
 ## 📄 License
