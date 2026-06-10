@@ -239,5 +239,3 @@ This project is licensed under the **MIT License**. See `LICENSE` for details.
 
 *Built on SQL Server · Medallion Architecture · Star Schema · T-SQL · SSMS* *Last updated: June 2026 — DataWarehouse v1.0*
 
-```
-
